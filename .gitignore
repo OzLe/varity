@@ -23,7 +23,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-config/neo4j_config.yaml
 
 # Virtual Environment
 venv/
@@ -38,14 +37,14 @@ ENV/
 # Logs
 *.log
 
-# Neo4j data
-neo4j_data/
-neo4j_logs/
-neo4j_plugins/
-
 # OS
 .DS_Store
 Thumbs.db
 model_cache/
-docs/
 .cursor
+
+# Docker
+docker-compose.override.yml
+
+# Testing
+.pytest_cache/

@@ -22,7 +22,6 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "varity-cli=src.presentation.cli.esco_cli:cli",
             "varity-search=src.application.services.search_application_service:main",
         ],
     },

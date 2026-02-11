@@ -39,7 +39,6 @@ python src/esco_cli.py translate --type Skill --property prefLabel --batch-size 
 
 ### Entry Points (from setup.py)
 
-- `varity-cli` → `src.presentation.cli.esco_cli:cli`
 - `varity-search` → `src.application.services.search_application_service:main`
 
 ## Testing
@@ -56,7 +55,13 @@ Test fixtures are in `tests/conftest.py` and include mock Weaviate clients, test
 
 ## Architecture
 
-The project follows **Clean Architecture** with four layers. Dependencies point inward: Presentation → Application → Domain/Core ← Infrastructure.
+The project uses a layered architecture with core domain entities, application services, and infrastructure implementations.
+
+### Primary Modules
+
+- `src/esco_ingest.py` — `WeaviateIngestor`: Main ingestion logic for loading ESCO data into Weaviate
+- `src/weaviate_semantic_search.py` — `VaritySemanticSearch`: Semantic search over Weaviate data
+- `src/esco_cli.py` — Click-based CLI entry point for ingestion, search, and translation commands
 
 ### Layers
 
@@ -64,33 +69,23 @@ The project follows **Clean Architecture** with four layers. Dependencies point 
 - `entities/`: `IngestionState`, `IngestionConfig`, `IngestionProgress`, search entities, ESCO entities
 - `interfaces/`: `repository_interface.py`, `service_interface.py`, `client_interface.py`
 
-**Domain** (`src/domain/`) — Pure business logic, framework-independent.
-- `ingestion/`: Ingestion domain service, state management, validation
-- `search/`: Search domain service
+**Domain** (`src/domain/`) — Pure business logic.
+- `ingestion/`: Ingestion domain service, state management service, validation domain service
 
 **Application** (`src/application/`) — Orchestration layer.
 - `services/`: `IngestionService`, search application service
-- `handlers/`: Request/response handling for ingestion and search
 
 **Infrastructure** (`src/infrastructure/`) — Technical implementations.
-- `database/weaviate/`: Weaviate client and repository implementations
-- `external/`: Embedding client, translation client
-- `config/`: Configuration management (profiles: `default`, `cloud`)
-- `ingestion/`: Init ingestion infrastructure
-
-**Presentation** (`src/presentation/`) — User-facing interfaces.
-- `cli/commands/`: Click-based CLI commands for ingestion, search, translation
-- `containers/`: Docker container initialization, health checks
+- `database/weaviate/`: Weaviate client
+- `external/`: Embedding utilities
+- `config/`: Configuration validation, environment config
+- `ingestion/`: Init ingestion, data reader, entity ingestor, relation builder, orchestrator
 
 **Shared** (`src/shared/`) — Cross-cutting concerns.
-- `di/`: Dependency injection container and service registry
-- `exceptions/`: Error handler, error context, recovery strategies
-- `logging/`: Structured logger with formatters
-- `validation/`: Validation engine and rules
-
-### Legacy Modules
-
-`src/esco_ingest.py` and `src/weaviate_semantic_search.py` are older modules still in use alongside the clean architecture layers.
+- `di/`: Dependency injection container, service registry, lifetime manager
+- `exceptions/`: Error context, recovery strategies
+- `logging/`: Structured logger, logger interface
+- `validation/`: Validator interface, validation rules
 
 ### Key Design Patterns
 
@@ -109,13 +104,26 @@ Weaviate schemas defined in `resources/schemas/` as YAML files (occupation, skil
 
 ESCO source data lives in `data/esco/` as CSV files.
 
+## Documentation
+
+Project documentation lives in `docs/`:
+- `esco_schema.md` — ESCO schema reference
+- `weaviate_queries.md` — Weaviate query examples
+- `project_overview.md` — Project overview
+- `python_docstring_guide.md` — Docstring style guide
+- `architecture.svg` — Architecture diagram
+
+## Code Navigation
+
+When searching for definitions, references, or understanding code structure, prefer the GKG Knowledge Graph MCP tools (`search_codebase_definitions`, `read_definitions`, `get_references`, `get_definition`, `repo_map`) over Glob and Grep. These tools provide structured, semantically-aware results (function signatures, call sites, dependency graphs) that are faster and more precise than file-level pattern matching. Fall back to Glob/Grep only when the knowledge graph does not cover the needed information (e.g., searching inside comments, config files, or non-code assets).
+
 ## Conventions
 
 - **Python 3.10+** required
 - **Formatting**: Black (88 char line length)
 - **Linting**: Ruff/Flake8 + Pylint
 - **Type hints**: Required on all functions (MyPy, avoid `Any`)
-- **Docstrings**: Google-style, mandatory for public APIs (see `python_docstring_guide.md`)
+- **Docstrings**: Google-style, mandatory for public APIs (see `docs/python_docstring_guide.md`)
 - **Commits**: Conventional Commits format (`feat:`, `fix:`, etc.)
 - **Terminology**: Use "URI" not "URL" for ESCO identifiers, "concept" over "entity" for ESCO items, "taxonomy" for ESCO structure, "ingestion" for data loading
 - **Weaviate client version**: v3 API (`weaviate-client 3.26.7`)
