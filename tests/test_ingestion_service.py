@@ -7,13 +7,11 @@ from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 import time
 
-from src.services.ingestion_service import IngestionService
-from src.models.ingestion_models import (
+from src.application.services.ingestion_application_service import IngestionService
+from src.core.entities.ingestion_entity import (
     IngestionState,
-    IngestionDecision,
-    IngestionProgress,
-    IngestionResult,
-    ValidationResult
+    IngestionConfig,
+    IngestionResult
 )
 
 class TestIngestionService:

@@ -2,13 +2,13 @@ import re
 from typing import List, Dict, Optional, Any, Tuple
 from dataclasses import dataclass
 from sentence_transformers import SentenceTransformer
-from src.logging_config import setup_logging
-from src.esco_weaviate_client import WeaviateClient
+from src.shared.logging.structured_logger import configure_logging
+from src.infrastructure.database.weaviate.weaviate_client import WeaviateClient
 import torch
 import numpy as np
 import json
 
-logger = setup_logging()
+logger = configure_logging()
 
 @dataclass
 class TaxonomyEnrichmentResult:
@@ -98,7 +98,7 @@ class JobPostingProcessor:
             'preferred': list(set(preferred_requirements))
         }
 
-class ESCOSemanticSearch:
+class VaritySemanticSearch:
     def __init__(self, config_path: str = "config/weaviate_config.yaml", profile: str = "default"):
         """Initialize the semantic search with configuration."""
         self.client = WeaviateClient(config_path, profile)
@@ -557,3 +557,6 @@ class ESCOSemanticSearch:
             "top_skills": [s["preferredLabel_en"] for s in result.extracted_skills[:5]],
             "critical_missing_skills": [s["preferredLabel_en"] for s in result.skill_gaps[:3]]
         }
+
+ESCOSemanticSearch = VaritySemanticSearch
+WeaviateSemanticSearch = VaritySemanticSearch

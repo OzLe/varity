@@ -16,9 +16,8 @@ import subprocess
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
-from src.services.ingestion_service import IngestionService
-from src.services.search_service import SearchService
-from src.models.ingestion_models import IngestionConfig
+from src.application.services.ingestion_application_service import IngestionService
+from src.core.entities.ingestion_entity import IngestionConfig
 
 class TestIntegration:
     """Integration test suite for the ESCO system."""
@@ -148,24 +147,21 @@ class TestIntegration:
         # Start ingestion
         ingestion_service = IngestionService(IngestionConfig(test_config))
         
-        # Start search service
-        search_service = SearchService(test_config)
-        
         # Verify search service waits
         start_time = datetime.utcnow()
-        is_valid, _ = search_service.validate_data()
+        response = requests.get("http://localhost:8000/health")
         wait_time = (datetime.utcnow() - start_time).total_seconds()
         
-        assert not is_valid, "Search service should not be valid during ingestion"
+        assert response.status_code != 200, "Search service should not be healthy during ingestion"
         assert wait_time >= 1, "Search service should wait for ingestion"
         
         # Complete ingestion
         result = ingestion_service.run_ingestion()
         assert result.success, "Should complete ingestion"
         
-        # Verify search service becomes valid
-        is_valid, _ = search_service.validate_data()
-        assert is_valid, "Search service should be valid after ingestion"
+        # Verify search service becomes healthy
+        response = requests.get("http://localhost:8000/health")
+        assert response.status_code == 200, "Search service should be healthy after ingestion"
 
     def _wait_for_weaviate(self, timeout: int = 60) -> None:
         """Wait for Weaviate to be ready."""

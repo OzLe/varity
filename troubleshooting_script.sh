@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# ESCO Schema Troubleshooting Script
+# Varity Schema Troubleshooting Script
 # This script helps resolve common Weaviate schema issues
 
 set -e
 
-echo "🔧 ESCO Schema Troubleshooting Script"
-echo "====================================="
+echo "🔧 Varity Schema Troubleshooting Script"
+echo "========================================"
 
 # Function to check if Docker services are running
 check_services() {
@@ -54,7 +54,7 @@ reset_weaviate_data() {
     docker compose down
     
     # Remove Weaviate data volume
-    docker volume rm esco-ingest_weaviate_data 2>/dev/null || true
+    docker volume rm varity_weaviate_data 2>/dev/null || true
     
     # Start services again
     docker compose up -d weaviate t2v-transformers
@@ -68,7 +68,7 @@ check_schema_status() {
     echo "📊 Checking schema status..."
     
     python -c "
-from src.esco_weaviate_client import WeaviateClient
+from src.infrastructure.database.weaviate.weaviate_client import WeaviateClient
 try:
     client = WeaviateClient()
     schema = client.client.schema.get()
@@ -86,7 +86,7 @@ reset_schema_only() {
     echo "🔄 Resetting schema only..."
     
     python -c "
-from src.esco_weaviate_client import WeaviateClient
+from src.infrastructure.database.weaviate.weaviate_client import WeaviateClient
 try:
     client = WeaviateClient()
     client.reset_schema()
@@ -155,8 +155,8 @@ handle_option_5() {
     fi
     
     # Run ingestion
-    echo "📥 Starting ESCO data ingestion..."
-    python src/esco_cli.py ingest --config config/weaviate_config.yaml --delete-all
+    echo "📥 Starting Varity data ingestion..."
+    python -m src.infrastructure.ingestion.ingestion_cli ingest --config config/weaviate_config.yaml --delete-all
 }
 
 # Main script loop
@@ -193,12 +193,12 @@ if [ ! -f "docker-compose.yml" ]; then
 fi
 
 # Check if Python environment is set up
-if ! python -c "import src.esco_weaviate_client" 2>/dev/null; then
+if ! python -c "import src.infrastructure.database.weaviate.weaviate_client" 2>/dev/null; then
     echo "❌ Error: Python environment not set up correctly"
     echo "💡 Please ensure you have installed the required dependencies"
     echo "   Run: pip install -r requirements.txt"
     exit 1
 fi
 
-# Run main menu
+# Run the main script
 main

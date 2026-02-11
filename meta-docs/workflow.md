@@ -1,13 +1,13 @@
-# Implementation Instructions: ESCO Ingestion System Improvements
+# Implementation Instructions: Varity Ingestion System Improvements
 
 ## Overview
-Fix the ESCO data ingestion system to handle automated deployments, prevent race conditions, and ensure idempotent operations. The system uses Docker Compose with Weaviate vector database and needs to handle both cold starts (no data) and warm starts (existing data) gracefully.
+Fix the Varity data ingestion system to handle automated deployments, prevent race conditions, and ensure idempotent operations. The system uses Docker Compose with Weaviate vector database and needs to handle both cold starts (no data) and warm starts (existing data) gracefully.
 
 ## Required Changes
 
 ### 1. Environment Detection for Non-Interactive Mode
 
-**File**: `src/esco_ingest.py`
+**File**: `src/infrastructure/database/weaviate/weaviate_client.py`
 
 **Task**: Modify the `run_ingest()` method to detect Docker/non-interactive environments and skip user prompts.
 
@@ -31,9 +31,9 @@ if existing_classes and not force_reingest:
 
 **File**: `docker-compose.yml`
 
-**Task**: Add environment variable to esco-ingest service:
+**Task**: Add environment variable to varity-ingest service:
 ```yaml
-esco-ingest:
+varity-ingest:
   # ... existing config ...
   environment:
     - PYTHONPATH=/app
@@ -44,7 +44,7 @@ esco-ingest:
 
 ### 2. Ingestion State Management
 
-**File**: `src/esco_weaviate_client.py`
+**File**: `src/infrastructure/database/weaviate/weaviate_client.py`
 
 **Task**: Add methods to track ingestion state:
 
@@ -122,7 +122,7 @@ properties:
 
 ### 3. Idempotent Ingestion Operations
 
-**File**: `src/repositories/weaviate_repository.py`
+**File**: `src/infrastructure/database/weaviate/repositories/document_repository.py`
 
 **Task**: Add upsert functionality:
 
@@ -168,7 +168,7 @@ def batch_upsert(self, data_list: List[Dict[str, Any]], vectors: List[np.ndarray
 
 ### 4. Modify Ingestion Methods to Use Upsert
 
-**File**: `src/esco_ingest.py`
+**File**: `src/application/services/ingestion_application_service.py`
 
 **Task**: Replace `batch_import` calls with `batch_upsert`:
 
@@ -181,7 +181,7 @@ self.skill_repo.batch_upsert(skills_to_import, skill_vectors)
 
 ### 5. Add Ingestion Progress Tracking
 
-**File**: `src/esco_ingest.py`
+**File**: `src/application/services/ingestion_application_service.py`
 
 **Task**: Wrap the `run_ingest` method with state tracking:
 
@@ -241,7 +241,7 @@ echo "Checking ingestion status..."
 
 # Run Python script to check status
 python -c "
-from src.esco_weaviate_client import WeaviateClient
+from src.infrastructure.database.weaviate.weaviate_client import WeaviateClient
 import sys
 
 try:
@@ -277,7 +277,7 @@ else # exit_code == 2
     
     echo "Ingestion command finished. Verifying status..."
     python -c "
-from src.esco_weaviate_client import WeaviateClient
+from src.infrastructure.database.weaviate.weaviate_client import WeaviateClient
 import sys
 import json # Required for details
 
@@ -324,15 +324,15 @@ fi
 
 **File**: `docker-compose.yml`
 
-**Task**: Replace esco-ingest service with init container pattern:
+**Task**: Replace varity-ingest service with init container pattern:
 
 ```yaml
-# Remove or comment out the existing esco-ingest service
+# Remove or comment out the existing varity-ingest service
 # Add new init service:
 
-esco-init:
+varity-init:
   build: .
-  container_name: esco_init
+  container_name: varity_init
   depends_on:
     weaviate:
       condition: service_healthy
@@ -352,13 +352,13 @@ esco-init:
   command: ["/app/scripts/init_ingestion.sh"]
   restart: "no"
   networks:
-    - esco_network
+    - varity_network
 
-# Update esco-search to depend on esco-init:
-esco-search:
+# Update varity-search to depend on varity-init:
+varity-search:
   # ... existing config ...
   depends_on:
-    esco-init:
+    varity-init:
       condition: service_completed_successfully
     weaviate:
       condition: service_healthy
@@ -417,7 +417,7 @@ def validate_data(self) -> Tuple[bool, Dict[str, Any]]:
 
 4. **Test Concurrent Start**:
    ```bash
-   docker-compose up --scale esco-init=2
+   docker-compose up --scale varity-init=2
    # Verify only one ingestion runs
    ```
 

@@ -53,10 +53,10 @@ handle_timeout() {
     done
 }
 
-log "Starting ESCO ingestion initialization"
+log "Starting Varity ingestion initialization"
 
 # Run Python script to check status (using service layer)
-python -m src.init_ingestion "$@" &
+python -m src.infrastructure.ingestion.init_ingestion "$@" &
 INGESTION_PID=$!
 
 # Monitor the ingestion process with timeout

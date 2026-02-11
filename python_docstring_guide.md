@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide defines the documentation standards for the ESCO Data Management and Search Tool project. We use Google-style docstrings for consistency, readability, and compatibility with documentation generation tools.
+This guide defines the documentation standards for the Varity project. We use Google-style docstrings for consistency, readability, and compatibility with documentation generation tools.
 
 ## General Principles
 
@@ -18,7 +18,7 @@ Every Python module should start with a module-level docstring describing its pu
 
 ```python
 """
-Service layer for ESCO data ingestion operations.
+Application service layer for ESCO data ingestion operations.
 
 This module provides a unified interface for all ingestion-related business logic,
 eliminating duplication between CLI and container initialization approaches.
@@ -32,9 +32,9 @@ of the complete ingestion pipeline.
 Class docstrings should describe the class purpose, key attributes, and usage patterns.
 
 ```python
-class IngestionService:
+class IngestionApplicationService:
     """
-    Service layer for ESCO data ingestion operations.
+    Application service layer for ESCO data ingestion operations.
     
     This class provides a unified interface for all ingestion-related business logic,
     eliminating duplication between CLI and container initialization approaches.
@@ -48,7 +48,7 @@ class IngestionService:
     
     Example:
         >>> config = IngestionConfig("config.yaml", "default")
-        >>> service = IngestionService(config)
+        >>> service = IngestionApplicationService(config)
         >>> result = service.run_ingestion()
         >>> print(f"Success: {result.success}")
     """
@@ -143,26 +143,26 @@ def client(self) -> WeaviateClient:
 
 ```python
 @staticmethod
-def create_from_config(config_path: str, profile: str) -> 'IngestionService':
+def create_from_config(config_path: str, profile: str) -> 'IngestionApplicationService':
     """
-    Create an IngestionService instance from configuration file.
+    Create an IngestionApplicationService instance from configuration file.
     
     Factory method that loads configuration from a YAML file and creates
-    a properly configured IngestionService instance.
+    a properly configured IngestionApplicationService instance.
     
     Args:
         config_path: Path to the YAML configuration file.
         profile: Configuration profile name to use (e.g., 'default', 'dev', 'prod').
     
     Returns:
-        IngestionService: Configured service instance ready for use.
+        IngestionApplicationService: Configured service instance ready for use.
     
     Raises:
         FileNotFoundError: If configuration file doesn't exist.
         ConfigurationError: If profile is not found or configuration is invalid.
     
     Example:
-        >>> service = IngestionService.create_from_config(
+        >>> service = IngestionApplicationService.create_from_config(
         ...     "config/weaviate_config.yaml", 
         ...     "production"
         ... )
@@ -198,9 +198,6 @@ class IngestionResult:
     success: bool
     steps_completed: int
     total_steps: int
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    # ... other fields
 ```
 
 ## Exception Docstrings

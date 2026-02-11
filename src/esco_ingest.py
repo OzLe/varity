@@ -6,19 +6,20 @@ import yaml
 from abc import ABC, abstractmethod
 import numpy as np
 from datetime import datetime
+from typing import Optional, Dict, Any
 
 # Local imports
-from src.esco_weaviate_client import WeaviateClient
-from src.embedding_utils import ESCOEmbedding
-from src.logging_config import setup_logging
-from src.weaviate_semantic_search import ESCOSemanticSearch
+from src.infrastructure.database.weaviate.weaviate_client import WeaviateClient
+from src.infrastructure.external.embedding_utils import ESCOEmbedding
+from src.shared.logging.structured_logger import configure_logging
+from src.weaviate_semantic_search import VaritySemanticSearch
 
 # ESCO v1.2.0 (English) – CSV classification import for Weaviate
 # Oz Levi
 # 2025-05-11
 
 # Setup logging
-logger = setup_logging()
+logger = configure_logging()
 
 class BaseIngestor(ABC):
     """Base class for ESCO data ingestion"""
@@ -99,17 +100,10 @@ class BaseIngestor(ABC):
 class WeaviateIngestor(BaseIngestor):
     """Weaviate-specific implementation of ESCO data ingestion"""
     
-    def __init__(self, config_path: str = "config/weaviate_config.yaml", profile: str = "default"):
+    def __init__(self, config_path: str = "config/weaviate_config.yaml", profile: str = "default", client: Optional[WeaviateClient] = None):
         """Initialize the Weaviate ingestor."""
         super().__init__(config_path, profile)
-        self.client = WeaviateClient(config_path, profile)
-        
-        # Initialize repositories
-        self.skill_repo = self.client.get_repository("Skill")
-        self.occupation_repo = self.client.get_repository("Occupation")
-        self.isco_group_repo = self.client.get_repository("ISCOGroup")
-        self.skill_collection_repo = self.client.get_repository("SkillCollection")
-        self.skill_group_repo = self.client.get_repository("SkillGroup")
+        self.client = client or WeaviateClient(url=os.getenv("WEAVIATE_URL", "http://weaviate:8080"))
         self.embedding_util = ESCOEmbedding()
 
     def _get_default_config_path(self):
@@ -118,15 +112,66 @@ class WeaviateIngestor(BaseIngestor):
     def initialize_schema(self):
         """Initialize the Weaviate schema if not already initialized."""
         try:
-            if not self.client.is_schema_initialized():
+            if not self.client.is_connected():
                 logger.info("Initializing Weaviate schema...")
-                self.client.ensure_schema()
+                self.client.create_schema(self._get_schema())
                 logger.info("Schema initialization completed")
             else:
                 logger.info("Schema already initialized")
         except Exception as e:
             logger.error(f"Failed to initialize schema: {str(e)}")
             raise
+
+    def _get_schema(self) -> Dict[str, Any]:
+        """Get the Weaviate schema definition."""
+        return {
+            "classes": [
+                {
+                    "class": "Skill",
+                    "description": "A skill from the ESCO classification",
+                    "vectorizer": "text2vec-transformers",
+                    "properties": [
+                        {
+                            "name": "uri",
+                            "dataType": ["string"],
+                            "description": "URI of the skill"
+                        },
+                        {
+                            "name": "preferredLabel",
+                            "dataType": ["string"],
+                            "description": "Preferred label of the skill"
+                        },
+                        {
+                            "name": "description",
+                            "dataType": ["text"],
+                            "description": "Description of the skill"
+                        }
+                    ]
+                },
+                {
+                    "class": "Occupation",
+                    "description": "An occupation from the ESCO classification",
+                    "vectorizer": "text2vec-transformers",
+                    "properties": [
+                        {
+                            "name": "uri",
+                            "dataType": ["string"],
+                            "description": "URI of the occupation"
+                        },
+                        {
+                            "name": "preferredLabel",
+                            "dataType": ["string"],
+                            "description": "Preferred label of the occupation"
+                        },
+                        {
+                            "name": "description",
+                            "dataType": ["text"],
+                            "description": "Description of the occupation"
+                        }
+                    ]
+                }
+            ]
+        }
 
     # ------------------------------------------------------------------ #
     # Internal helpers
@@ -287,10 +332,7 @@ class WeaviateIngestor(BaseIngestor):
                     # Create UUID from URI
                     uuid = isco_group_data["uri"].split("/")[-1]
 
-                    self.isco_group_repo.create_object(
-                        properties=isco_group_data,
-                        uuid=uuid
-                    )
+                    self.client.add_object(class_name="ISCOGroup", properties=isco_group_data, uuid=uuid)
 
                 except Exception as e:
                     logger.error(f"Failed to ingest ISCO group {row.get('conceptUri', 'unknown')}: {str(e)}")
@@ -309,7 +351,7 @@ class WeaviateIngestor(BaseIngestor):
                 try:
                     # Create occupation object
                     occupation = {
-                        "conceptUri": row["conceptUri"],
+                        "uri": row["conceptUri"],
                         "preferredLabel_en": row["preferredLabel_en"],
                         "description_en": row.get("description_en", ""),
                         "definition_en": row.get("definition_en", ""),
@@ -318,7 +360,7 @@ class WeaviateIngestor(BaseIngestor):
                     }
                     
                     # Add to repository
-                    self.occupation_repo.add(occupation)
+                    self.client.add_object(class_name="Occupation", properties=occupation)
                     
                 except Exception as e:
                     logger.error(f"Error processing occupation {row.get('conceptUri', 'unknown')}: {str(e)}")
@@ -348,7 +390,7 @@ class WeaviateIngestor(BaseIngestor):
                 try:
                     # Create skill object
                     skill = {
-                        "conceptUri": row["conceptUri"],
+                        "uri": row["conceptUri"],
                         "preferredLabel_en": row["preferredLabel_en"],
                         "description_en": row.get("description_en", ""),
                         "skillType": row.get("skillType", ""),
@@ -357,7 +399,7 @@ class WeaviateIngestor(BaseIngestor):
                     }
                     
                     # Add to repository
-                    self.skill_repo.add(skill)
+                    self.client.add_object(class_name="Skill", properties=skill)
                     
                 except Exception as e:
                     logger.error(f"Error processing skill {row.get('conceptUri', 'unknown')}: {str(e)}")
@@ -402,8 +444,8 @@ class WeaviateIngestor(BaseIngestor):
                     relation_type = row.get('relationType', 'related')
 
                     # Check if both objects exist before creating relation
-                    occupation_exists = self.occupation_repo.check_object_exists(occupation_uuid)
-                    skill_exists = self.skill_repo.check_object_exists(skill_uuid)
+                    occupation_exists = self.client.check_object_exists(class_name="Occupation", uuid=occupation_uuid)
+                    skill_exists = self.client.check_object_exists(class_name="Skill", uuid=skill_uuid)
 
                     if not occupation_exists:
                         logger.warning(f"Occupation {occupation_uuid} not found - skipping relation")
@@ -414,20 +456,23 @@ class WeaviateIngestor(BaseIngestor):
 
                     # Add relation based on type
                     if relation_type == 'essential':
-                        self.occupation_repo.add_essential_skill_relation(
-                            occupation_uri=occupation_uuid,
-                            skill_uri=skill_uuid
+                        self.client.add_essential_skill_relation(
+                            class_name="Occupation",
+                            uuid=occupation_uuid,
+                            skill_uuid=skill_uuid
                         )
                     elif relation_type == 'optional':
-                        self.occupation_repo.add_optional_skill_relation(
-                            occupation_uri=occupation_uuid,
-                            skill_uri=skill_uuid
+                        self.client.add_optional_skill_relation(
+                            class_name="Occupation",
+                            uuid=occupation_uuid,
+                            skill_uuid=skill_uuid
                         )
                     else:
                         # Default to essential if type is unclear
-                        self.occupation_repo.add_essential_skill_relation(
-                            occupation_uri=occupation_uuid,
-                            skill_uri=skill_uuid
+                        self.client.add_essential_skill_relation(
+                            class_name="Occupation",
+                            uuid=occupation_uuid,
+                            skill_uuid=skill_uuid
                         )
                 except Exception as e:
                     logger.error(f"Failed to create occupation-skill relation: {str(e)}")
@@ -464,8 +509,8 @@ class WeaviateIngestor(BaseIngestor):
                     narrower_uuid = row['narrowerUri'].split('/')[-1]
 
                     # Check if both occupations exist before creating relation
-                    broader_exists = self.occupation_repo.check_object_exists(broader_uuid)
-                    narrower_exists = self.occupation_repo.check_object_exists(narrower_uuid)
+                    broader_exists = self.client.check_object_exists(class_name="Occupation", uuid=broader_uuid)
+                    narrower_exists = self.client.check_object_exists(class_name="Occupation", uuid=narrower_uuid)
 
                     if not broader_exists:
                         logger.warning(f"Broader occupation {broader_uuid} not found - skipping relation")
@@ -475,9 +520,10 @@ class WeaviateIngestor(BaseIngestor):
                         continue
 
                     # Add broader occupation relation
-                    self.occupation_repo.add_broader_occupation_relation(
-                        occupation_uri=narrower_uuid,
-                        broader_uri=broader_uuid
+                    self.client.add_broader_occupation_relation(
+                        class_name="Occupation",
+                        uuid=narrower_uuid,
+                        broader_uuid=broader_uuid
                     )
                 except Exception as e:
                     logger.error(f"Failed to create hierarchical relation: {str(e)}")
@@ -491,7 +537,7 @@ class WeaviateIngestor(BaseIngestor):
         # Get all occupations and update their ISCO group relations
         try:
             # We'll iterate through all occupations and link them to their ISCO groups
-            occupations = self.occupation_repo.get_all_objects()
+            occupations = self.client.get_objects(class_name="Occupation")
             
             with tqdm(total=len(occupations), desc="Creating ISCO Group Relations", unit="occupation") as pbar:
                 for occupation in occupations:
@@ -501,15 +547,16 @@ class WeaviateIngestor(BaseIngestor):
                             continue
 
                         # Find the ISCO group with this code
-                        isco_groups = self.isco_group_repo.get_objects_by_property('code', isco_code)
+                        isco_groups = self.client.get_objects(class_name="ISCOGroup", property="code", value=isco_code)
                         if isco_groups:
                             isco_group_uuid = isco_groups[0]['_id']
                             occupation_uuid = occupation['_id']
                             
                             # Add relation
-                            self.occupation_repo.add_isco_group_relation(
-                                occupation_uri=occupation_uuid,
-                                isco_group_uri=isco_group_uuid
+                            self.client.add_isco_group_relation(
+                                class_name="Occupation",
+                                uuid=occupation_uuid,
+                                isco_group_uuid=isco_group_uuid
                             )
                     except Exception as e:
                         logger.error(f"Failed to create ISCO group relation: {str(e)}")
@@ -529,14 +576,14 @@ class WeaviateIngestor(BaseIngestor):
                 try:
                     # Create skill group object
                     skill_group = {
-                        "conceptUri": row["conceptUri"],
+                        "uri": row["conceptUri"],
                         "preferredLabel_en": row["preferredLabel_en"],
                         "description_en": row.get("description_en", ""),
                         "altLabels_en": row.get("altLabels_en", "").split("|") if pd.notna(row.get("altLabels_en")) else []
                     }
                     
                     # Add to repository
-                    self.skill_group_repo.add(skill_group)
+                    self.client.add_object(class_name="SkillGroup", properties=skill_group)
                     
                 except Exception as e:
                     logger.error(f"Error processing skill group {row.get('conceptUri', 'unknown')}: {str(e)}")
@@ -566,14 +613,14 @@ class WeaviateIngestor(BaseIngestor):
                 try:
                     # Create skill collection object
                     collection = {
-                        "conceptUri": row["conceptUri"],
+                        "uri": row["conceptUri"],
                         "preferredLabel_en": row["preferredLabel_en"],
                         "description_en": row.get("description_en", ""),
                         "altLabels_en": row.get("altLabels_en", "").split("|") if pd.notna(row.get("altLabels_en")) else []
                     }
                     
                     # Add to repository
-                    self.skill_collection_repo.add(collection)
+                    self.client.add_object(class_name="SkillCollection", properties=collection)
                     
                 except Exception as e:
                     logger.error(f"Error processing skill collection {row.get('conceptUri', 'unknown')}: {str(e)}")
@@ -623,8 +670,8 @@ class WeaviateIngestor(BaseIngestor):
                     skill_uuid = row['skillUri'].split('/')[-1]
 
                     # Check if both objects exist before creating relation
-                    collection_exists = self.skill_collection_repo.check_object_exists(collection_uuid)
-                    skill_exists = self.skill_repo.check_object_exists(skill_uuid)
+                    collection_exists = self.client.check_object_exists(class_name="SkillCollection", uuid=collection_uuid)
+                    skill_exists = self.client.check_object_exists(class_name="Skill", uuid=skill_uuid)
 
                     if not collection_exists:
                         logger.warning(f"Skill collection {collection_uuid} not found - skipping relation")
@@ -634,9 +681,10 @@ class WeaviateIngestor(BaseIngestor):
                         continue
 
                     # Add relation
-                    self.skill_repo.add_skill_collection_relation(
-                        skill_uri=skill_uuid,
-                        collection_uri=collection_uuid
+                    self.client.add_skill_collection_relation(
+                        class_name="Skill",
+                        uuid=skill_uuid,
+                        collection_uuid=collection_uuid
                     )
                 except Exception as e:
                     logger.error(f"Failed to create skill collection relation: {str(e)}")
@@ -668,8 +716,8 @@ class WeaviateIngestor(BaseIngestor):
                     relation_type = row.get('relationType', 'related')
 
                     # Check if both skills exist before creating relation
-                    skill_exists = self.skill_repo.check_object_exists(skill_uuid)
-                    related_exists = self.skill_repo.check_object_exists(related_uuid)
+                    skill_exists = self.client.check_object_exists(class_name="Skill", uuid=skill_uuid)
+                    related_exists = self.client.check_object_exists(class_name="Skill", uuid=related_uuid)
 
                     if not skill_exists:
                         logger.warning(f"Skill {skill_uuid} not found - skipping relation")
@@ -679,9 +727,10 @@ class WeaviateIngestor(BaseIngestor):
                         continue
 
                     # Add relation
-                    self.skill_repo.add_related_skill_relation(
-                        skill_uri=skill_uuid,
-                        related_uri=related_uuid,
+                    self.client.add_related_skill_relation(
+                        class_name="Skill",
+                        uuid=skill_uuid,
+                        related_uuid=related_uuid,
                         relation_type=relation_type
                     )
                 except Exception as e:
@@ -719,8 +768,8 @@ class WeaviateIngestor(BaseIngestor):
                     broader_uuid = row['broaderUri'].split('/')[-1]
 
                     # Check if both skills exist before creating relation
-                    skill_exists = self.skill_repo.check_object_exists(skill_uuid)
-                    broader_exists = self.skill_repo.check_object_exists(broader_uuid)
+                    skill_exists = self.client.check_object_exists(class_name="Skill", uuid=skill_uuid)
+                    broader_exists = self.client.check_object_exists(class_name="Skill", uuid=broader_uuid)
 
                     if not skill_exists:
                         logger.warning(f"Skill {skill_uuid} not found - skipping relation")
@@ -730,9 +779,10 @@ class WeaviateIngestor(BaseIngestor):
                         continue
 
                     # Add relation
-                    self.skill_repo.add_broader_skill_relation(
-                        skill_uri=skill_uuid,
-                        broader_uri=broader_uuid
+                    self.client.add_broader_skill_relation(
+                        class_name="Skill",
+                        uuid=skill_uuid,
+                        broader_uuid=broader_uuid
                     )
                 except Exception as e:
                     logger.error(f"Failed to add broader skill relation: {str(e)}")

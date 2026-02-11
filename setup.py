@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="esco-semantic",
+    name="varity",
     version="1.0.0",
     packages=find_packages(),
     install_requires=[
@@ -21,8 +21,8 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "esco-cli=src.esco_cli:cli",
-            "esco-search=src.search_service:main",
+            "varity-cli=src.presentation.cli.esco_cli:cli",
+            "varity-search=src.application.services.search_application_service:main",
         ],
     },
     python_requires=">=3.10",

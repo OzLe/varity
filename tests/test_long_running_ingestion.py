@@ -13,12 +13,13 @@ from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 from typing import Dict, Any
 
-from src.services.ingestion_service import IngestionService
-from src.services.search_service import SearchService
-from src.models.ingestion_models import (
+from src.application.services.ingestion_application_service import IngestionService
+from src.application.services.search_application_service import SearchService
+from src.core.entities.ingestion_entity import (
     IngestionState,
-    IngestionProgress,
-    IngestionConfig
+    IngestionConfig,
+    IngestionResult,
+    IngestionProgress
 )
 from src.weaviate_semantic_search import WeaviateSemanticSearch
 
@@ -116,6 +117,7 @@ class TestLongRunningIngestion:
     def test_search_service_waiting_logic(self, mock_weaviate_client, mock_search_client, test_config):
         """Test that search service properly waits for ingestion completion"""
         # Setup
+        # search_service = SearchService(test_config)
         search_service = SearchService(test_config)
         search_service.client = mock_weaviate_client
         search_service.search = mock_search_client
@@ -256,6 +258,7 @@ class TestLongRunningIngestion:
     def test_search_service_validation_during_ingestion(self, mock_weaviate_client, mock_search_client, test_config):
         """Test search service validation behavior during ingestion"""
         # Setup
+        # search_service = SearchService(test_config)
         search_service = SearchService(test_config)
         search_service.client = mock_weaviate_client
         search_service.search = mock_search_client

@@ -1,5 +1,5 @@
 """
-ESCO Semantic Search Package
+Varity Semantic Search Package
 """
 
 __version__ = "1.0.0" 

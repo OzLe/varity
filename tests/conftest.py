@@ -7,10 +7,9 @@ from typing import Dict, Any
 from datetime import datetime, timedelta
 from unittest.mock import Mock
 
-from src.models.ingestion_models import IngestionConfig
-from src.services.ingestion_service import IngestionService
-from src.services.search_service import SearchService
-from src.weaviate_semantic_search import WeaviateSemanticSearch
+from src.core.entities.ingestion_entity import IngestionConfig
+from src.application.services.ingestion_application_service import IngestionService
+from src.weaviate_semantic_search import VaritySemanticSearch
 
 @pytest.fixture
 def test_config() -> Dict[str, Any]:
@@ -53,7 +52,7 @@ def mock_weaviate_client():
 @pytest.fixture
 def mock_search_client():
     """Mock search client for testing."""
-    client = Mock(spec=WeaviateSemanticSearch)
+    client = Mock(spec=VaritySemanticSearch)
     client.validate_data.return_value = (True, "Data is valid")
     return client
 
@@ -67,14 +66,6 @@ def ingestion_service(test_config, mock_weaviate_client):
     )
     service = IngestionService(config)
     service.client = mock_weaviate_client
-    return service
-
-@pytest.fixture
-def search_service(test_config, mock_weaviate_client, mock_search_client):
-    """Create a SearchService instance with test configuration."""
-    service = SearchService(test_config)
-    service.client = mock_weaviate_client
-    service.search = mock_search_client
     return service
 
 @pytest.fixture

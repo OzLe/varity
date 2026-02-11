@@ -1,4 +1,4 @@
-name: esco
+name: varity
 channels:
   - conda-forge
 dependencies:

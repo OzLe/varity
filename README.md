@@ -1,6 +1,6 @@
-# ESCO Data Management and Search Tool
+# Varity — ESCO Data Management and Search Tool
 
-This tool is designed for managing, searching, and translating the ESCO (European Skills, Competences, Qualifications and Occupations) taxonomy using Weaviate vector database. It provides a unified command-line interface for data ingestion, semantic search, and translation capabilities.
+Varity is a tool for managing, searching, and translating the ESCO (European Skills, Competences, Qualifications and Occupations) taxonomy using Weaviate vector database. It provides a unified command-line interface for data ingestion, semantic search, and translation capabilities.
 
 ## Features
 
@@ -53,7 +53,7 @@ This tool is designed for managing, searching, and translating the ESCO (Europea
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd ESCO-Ingest
+cd varity
 ```
 
 2. Start the services:
@@ -131,23 +131,30 @@ graph TD
 
 **Key Components:**
 
-1. **Service Layer (`src/services/`)**
-   - `IngestionService`: Centralized business logic for all ingestion operations
+1. **Application Layer (`src/application/services/`)**
+   - `IngestionApplicationService`: Centralized business logic for all ingestion operations
+   - `SearchApplicationService`: Search functionality and result processing
    - Handles status checking, validation, and orchestration
    - Provides unified interface for CLI and container initialization
 
-2. **Data Models (`src/models/`)**
-   - `IngestionState`: Enum for system states (NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED, UNKNOWN)
-   - `IngestionDecision`: Decision logic with reasoning and requirements
-   - `IngestionProgress`: Real-time progress tracking
-   - `IngestionResult`: Comprehensive operation results
-   - `ValidationResult`: Prerequisite validation status
-   - `IngestionConfig`: Centralized configuration management
+2. **Core Entities (`src/core/entities/`)**
+   - `IngestionEntity`: Core entities for ingestion operations
+   - `SearchEntity`: Core entities for search operations
+   - `ESCOEntity`: Base entity definitions
+   - Structured data models for consistent state management
 
-3. **Data Access Layer (`src/esco_ingest.py`)**
+3. **Infrastructure Layer (`src/infrastructure/`)**
+   - `database/`: Database access and client implementations
+   - `external/`: External service integrations
    - Pure data access operations
    - No business logic or user interaction
    - Simplified ingestion methods focused on data persistence
+
+4. **Presentation Layer (`src/presentation/`)**
+   - `cli/`: Command-line interface implementation
+   - `containers/`: Container initialization logic
+   - User interaction and input handling
+   - Command routing and response formatting
 
 ### Database Integration
 
@@ -299,10 +306,10 @@ The container initialization uses the same service layer for consistency:
 
 ```bash
 # Start container-based ingestion
-docker-compose up esco-init
+docker-compose up varity-init
 
 # Check ingestion status
-docker-compose logs esco-init
+docker-compose logs varity-init
 ```
 
 **Container Features:**
@@ -478,7 +485,7 @@ python src/esco_cli.py ingest --config config/weaviate_config.yaml --dry-run
 
 # Container status
 docker-compose ps
-docker-compose logs esco-init
+docker-compose logs varity-init
 ```
 
 ## Troubleshooting
@@ -516,7 +523,7 @@ export LOG_LEVEL=DEBUG
 
 2. Check container logs:
 ```bash
-docker-compose logs -f esco-init
+docker-compose logs -f varity-init
 ```
 
 3. Monitor database status:
@@ -531,8 +538,8 @@ python src/esco_cli.py ingest --config config/weaviate_config.yaml --dry-run
 
 # Detailed validation
 python -c "
-from src.services.ingestion_service import IngestionService
-from src.models.ingestion_models import IngestionConfig
+from src.application.services.ingestion_application_service import IngestionService
+from src.core.entities.ingestion_entity import IngestionConfig
 
 config = IngestionConfig('config/weaviate_config.yaml', 'default')
 service = IngestionService(config)
@@ -600,7 +607,7 @@ Adjust these values based on your system's performance and requirements.
 
 ### Project Structure
 ```
-ESCO-Ingest/
+varity/
 ├── config/
 │   └── weaviate_config.yaml
 ├── src/
@@ -647,8 +654,8 @@ When extending the service layer:
 
 ```python
 # Example service layer usage
-from src.services.ingestion_service import IngestionService
-from src.models.ingestion_models import IngestionConfig
+from src.application.services.ingestion_application_service import IngestionService
+from src.core.entities.ingestion_entity import IngestionConfig
 
 # Create configuration
 config = IngestionConfig(

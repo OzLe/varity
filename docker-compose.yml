@@ -3,7 +3,7 @@ version: '3.8'
 services:
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.31.0
-    container_name: esco_weaviate
+    container_name: varity_weaviate
     ports:
       - "8080:8080"
       - "50051:50051"
@@ -31,11 +31,11 @@ services:
       start_period: 120s
     restart: unless-stopped
     networks:
-      - esco_network
+      - varity_network
 
   t2v-transformers:
     image: ${TRANSFORMER_IMAGE:-semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2}
-    container_name: esco_transformers
+    container_name: varity_transformers
     environment:
       - ENABLE_CUDA=0
       - HF_HOME=/app/cache
@@ -55,11 +55,11 @@ services:
       start_period: 120s
     restart: unless-stopped
     networks:
-      - esco_network
+      - varity_network
 
-#  esco-ingest:
+#  varity-ingest:
 #    build: .
-#    container_name: esco_ingestion
+#    container_name: varity_ingestion
 #    depends_on:
 #      weaviate:
 #        condition: service_healthy
@@ -78,11 +78,11 @@ services:
 #      sh -c "python -m src.esco_cli ingest --config config/weaviate_config.yaml --profile default"
 #    restart: "no"
 #    networks:
-#      - esco_network
+#      - varity_network
 
-  esco-init:
+  varity-init:
     build: .
-    container_name: esco_init
+    container_name: varity_init
     depends_on:
       weaviate:
         condition: service_healthy
@@ -99,15 +99,15 @@ services:
       - ./src:/app/src
       - ./config:/app/config
       - ./scripts:/app/scripts
-      - ./resources:/app/resources # Ensure resources are mounted for schema access
+      - ./resources:/app/resources
     command: ["/app/scripts/init_ingestion.sh"]
     restart: "no"
     networks:
-      - esco_network
+      - varity_network
 
-  esco-search:
+  varity-search:
     build: .
-    container_name: esco_search
+    container_name: varity_search
     depends_on:
       weaviate:
         condition: service_healthy
@@ -124,20 +124,19 @@ services:
       - ./resources:/app/resources
     ports:
       - "8000:8000"
-    command: >
-      sh -c "python -m src.search_service"
+    command: sh -c "python -m src.application.services.search_application_service"
     restart: unless-stopped
     networks:
-      - esco_network
+      - varity_network
     healthcheck:
       test: ["CMD", "wget", "--spider", "--tries=1", "--timeout=10", "-q", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  esco-cli:
+  varity-cli:
     build: .
-    container_name: esco_cli
+    container_name: varity_cli
     depends_on:
       weaviate:
         condition: service_healthy
@@ -153,11 +152,11 @@ services:
       - ./config:/app/config
       - ./resources:/app/resources
     networks:
-      - esco_network
+      - varity_network
     # No default command - will be specified when running
 
 networks:
-  esco_network:
+  varity_network:
     driver: bridge
 
 volumes:

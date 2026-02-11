@@ -1,8 +1,8 @@
-# ESCO Data Management and Search Tool - Project Overview
+# Varity — Project Overview
 
 ## Executive Summary
 
-The ESCO Data Management and Search Tool is a comprehensive Python application designed for managing, searching, and translating the ESCO (European Skills, Competences, Qualifications and Occupations) taxonomy using Weaviate vector database. The system provides a unified command-line interface for data ingestion, semantic search, and translation capabilities with robust containerized deployment.
+Varity is a comprehensive Python application designed for managing, searching, and translating the ESCO (European Skills, Competences, Qualifications and Occupations) taxonomy using Weaviate vector database. The system provides a unified command-line interface for data ingestion, semantic search, and translation capabilities with robust containerized deployment.
 
 ## Architecture Overview
 
@@ -10,20 +10,23 @@ The ESCO Data Management and Search Tool is a comprehensive Python application d
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   CLI Layer     │    │  Container Init │    │  Search Service │
-│  (esco_cli.py)  │    │  (init_*.py)    │    │ (search_*.py)   │
+│  Presentation   │    │  Presentation   │    │  Presentation   │
+│    Layer        │    │    Layer        │    │    Layer        │
+│  (CLI/Contain)  │    │  (Containers)   │    │  (Search UI)    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  │
                     ┌─────────────────┐
-                    │  Service Layer  │
-                    │ (ingestion_*)   │
+                    │  Application    │
+                    │    Layer        │
+                    │  (Services)     │
                     └─────────────────┘
                                  │
                     ┌─────────────────┐
-                    │ Data Access     │
-                    │ (repositories)  │
+                    │  Infrastructure │
+                    │    Layer        │
+                    │  (Database/Ext) │
                     └─────────────────┘
                                  │
          ┌───────────────────────┼───────────────────────┐
@@ -34,14 +37,15 @@ The ESCO Data Management and Search Tool is a comprehensive Python application d
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### Service Layer Pattern
+### Clean Architecture Pattern
 
-The application follows a clean Service Layer architecture that eliminates code duplication:
+The application follows a clean architecture pattern that separates concerns:
 
-- **Service Layer**: Centralized business logic in `src/services/`
-- **Data Models**: Structured data models in `src/models/`
-- **Data Access Layer**: Pure data operations in `src/repositories/`
-- **Multiple Interfaces**: CLI, Container Init, and Search Service all use the same service layer
+- **Presentation Layer**: User interfaces in `src/presentation/`
+- **Application Layer**: Business logic in `src/application/services/`
+- **Core Layer**: Domain entities in `src/core/entities/`
+- **Infrastructure Layer**: Technical implementations in `src/infrastructure/`
+- **Multiple Interfaces**: CLI, Container Init, and Search Service all use the same application layer
 
 ## Domain Model
 
@@ -126,9 +130,9 @@ SkillCollection ↔ Skill (esco:hasSkill)
 #### Docker Services
 - **weaviate**: Main vector database
 - **t2v-transformers**: Transformer inference service
-- **esco-init**: Initialization container
-- **esco-search**: Search service
-- **esco-cli**: CLI container
+- **varity-init**: Initialization container
+- **varity-search**: Search service
+- **varity-cli**: CLI container
 
 ## Key Features
 
@@ -175,37 +179,33 @@ SkillCollection ↔ Skill (esco:hasSkill)
 ## Project Structure
 
 ```
-ESCO-Ingest/
+varity/
 ├── config/                     # Configuration files
 │   └── weaviate_config.yaml
 ├── src/                       # Source code
-│   ├── models/               # Data models (Service Layer)
-│   │   ├── __init__.py
-│   │   └── ingestion_models.py
-│   ├── services/             # Business logic (Service Layer)
-│   │   ├── __init__.py
-│   │   └── ingestion_service.py
-│   ├── repositories/         # Data access layer
-│   │   ├── base_repository.py
-│   │   ├── weaviate_repository.py
-│   │   ├── occupation_repository.py
-│   │   ├── skill_repository.py
-│   │   └── repository_factory.py
-│   ├── esco_cli.py          # CLI interface
-│   ├── init_ingestion.py    # Container initialization
-│   ├── esco_ingest.py       # Data ingestion logic
-│   ├── esco_weaviate_client.py # Weaviate client
-│   ├── weaviate_semantic_search.py # Search functionality
-│   ├── esco_translate.py    # Translation capabilities
-│   └── logging_config.py    # Logging configuration
-├── resources/               # Schema definitions
-│   └── schemas/
-├── scripts/                # Shell scripts
-│   └── init_ingestion.sh
-├── tests/                  # Test suites
-├── docker-compose.yml      # Container orchestration
-├── Dockerfile             # Container definition
-└── requirements.txt       # Python dependencies
+│   ├── application/          # Application layer
+│   │   └── services/        # Business logic services
+│   │       ├── ingestion_application_service.py
+│   │       └── search_application_service.py
+│   ├── core/                # Core layer
+│   │   ├── entities/       # Domain entities
+│   │   │   ├── ingestion_entity.py
+│   │   │   ├── search_entity.py
+│   │   │   └── esco_entity.py
+│   │   └── interfaces/     # Core interfaces
+│   │       ├── repository_interface.py
+│   │       └── service_interface.py
+│   ├── infrastructure/      # Infrastructure layer
+│   │   ├── database/       # Database implementations
+│   │   │   ├── weaviate/  # Weaviate specific code
+│   │   │   └── factory.py
+│   │   └── external/       # External service integrations
+│   ├── presentation/       # Presentation layer
+│   │   ├── cli/          # CLI implementation
+│   │   └── containers/   # Container initialization
+│   └── shared/           # Shared utilities
+│       ├── logging/      # Logging configuration
+│       └── exceptions/   # Error handling
 ```
 
 ## High-Level Goals
