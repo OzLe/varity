@@ -9,7 +9,7 @@ import asyncio
 import signal
 from typing import Optional, Dict, Any, List
 
-from ...application.services.search_service import SearchService
+from ...application.services.search_application_service import SearchApplicationService
 from ...domain.search.search_domain_service import SearchDomainService
 from ...infrastructure.database.factory import DatabaseFactory
 from ...infrastructure.config.config_manager import ConfigManager
@@ -19,11 +19,11 @@ from .health_check import HealthChecker, HealthMonitor
 class SearchContainer:
     """
     Container for document search operations.
-    
+
     This class manages the lifecycle of search operations,
     including initialization, health checks, and graceful shutdown.
     """
-    
+
     def __init__(
         self,
         config_path: Optional[str] = None,
@@ -31,7 +31,7 @@ class SearchContainer:
     ):
         """
         Initialize the container.
-        
+
         Args:
             config_path: Optional path to configuration file
             environment: Optional environment name
@@ -41,12 +41,13 @@ class SearchContainer:
             config_dir=config_path,
             environment=environment
         )
-        
+
         # Initialize services
-        self.database_factory = DatabaseFactory()
-        self.search_service = SearchService(
+        db_config = self.config_manager.load_config().get("database", {})
+        self.database_factory = DatabaseFactory(config=db_config)
+        self.search_service = SearchApplicationService(
             SearchDomainService(),
-            self.database_factory.create_database()
+            self.database_factory.client
         )
         
         # Initialize health monitoring

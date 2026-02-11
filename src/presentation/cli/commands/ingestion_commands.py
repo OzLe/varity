@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ...cli.handlers.cli_handler import CommandHandler, CommandResult
 from ...cli.formatters.output_formatter import OutputFormatter
-from ....application.services.ingestion_service import IngestionService
+from ....application.services.ingestion_application_service import IngestionApplicationService
 from ....domain.ingestion.ingestion_domain_service import IngestionDomainService
 from ....infrastructure.database.factory import DatabaseFactory
 
@@ -25,7 +25,7 @@ class IngestCommand(CommandHandler):
     def __init__(
         self,
         formatter: OutputFormatter,
-        ingestion_service: Optional[IngestionService] = None
+        ingestion_service: Optional[IngestionApplicationService] = None
     ):
         """
         Initialize the handler.
@@ -35,7 +35,7 @@ class IngestCommand(CommandHandler):
             ingestion_service: Optional ingestion service
         """
         super().__init__(formatter)
-        self.ingestion_service = ingestion_service or IngestionService(
+        self.ingestion_service = ingestion_service or IngestionApplicationService(
             IngestionDomainService(),
             DatabaseFactory.create_database()
         )
@@ -109,7 +109,7 @@ class ValidateCommand(CommandHandler):
     def __init__(
         self,
         formatter: OutputFormatter,
-        ingestion_service: Optional[IngestionService] = None
+        ingestion_service: Optional[IngestionApplicationService] = None
     ):
         """
         Initialize the handler.
@@ -119,7 +119,7 @@ class ValidateCommand(CommandHandler):
             ingestion_service: Optional ingestion service
         """
         super().__init__(formatter)
-        self.ingestion_service = ingestion_service or IngestionService(
+        self.ingestion_service = ingestion_service or IngestionApplicationService(
             IngestionDomainService(),
             DatabaseFactory.create_database()
         )
@@ -190,7 +190,7 @@ class StatusCommand(CommandHandler):
     def __init__(
         self,
         formatter: OutputFormatter,
-        ingestion_service: Optional[IngestionService] = None
+        ingestion_service: Optional[IngestionApplicationService] = None
     ):
         """
         Initialize the handler.
@@ -200,7 +200,7 @@ class StatusCommand(CommandHandler):
             ingestion_service: Optional ingestion service
         """
         super().__init__(formatter)
-        self.ingestion_service = ingestion_service or IngestionService(
+        self.ingestion_service = ingestion_service or IngestionApplicationService(
             IngestionDomainService(),
             DatabaseFactory.create_database()
         )

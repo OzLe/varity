@@ -8,8 +8,8 @@ document repository interface.
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from .......core.interfaces import RepositoryInterface
-from .......core.entities import (
+from .....core.interfaces import RepositoryInterface
+from .....core.entities import (
     Document,
     SearchQuery,
     SearchResult

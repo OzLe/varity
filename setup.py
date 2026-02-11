@@ -17,7 +17,8 @@ setup(
         "pyarrow>=12.0.0",
         "tiktoken>=0.6.0",
         "sentencepiece>=0.1.99",
-        "protobuf<4.0.0"
+        "protobuf<4.0.0",
+        "flask>=3.0.0"
     ],
     entry_points={
         "console_scripts": [

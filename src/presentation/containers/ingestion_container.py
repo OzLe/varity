@@ -10,7 +10,7 @@ import signal
 from typing import Optional, Dict, Any
 from pathlib import Path
 
-from ...application.services.ingestion_service import IngestionService
+from ...application.services.ingestion_application_service import IngestionApplicationService
 from ...domain.ingestion.ingestion_domain_service import IngestionDomainService
 from ...infrastructure.database.factory import DatabaseFactory
 from ...infrastructure.config.config_manager import ConfigManager
@@ -20,11 +20,11 @@ from .health_check import HealthChecker, HealthMonitor
 class IngestionContainer:
     """
     Container for document ingestion operations.
-    
+
     This class manages the lifecycle of ingestion operations,
     including initialization, health checks, and graceful shutdown.
     """
-    
+
     def __init__(
         self,
         config_path: Optional[str] = None,
@@ -32,7 +32,7 @@ class IngestionContainer:
     ):
         """
         Initialize the container.
-        
+
         Args:
             config_path: Optional path to configuration file
             environment: Optional environment name
@@ -42,12 +42,13 @@ class IngestionContainer:
             config_dir=config_path,
             environment=environment
         )
-        
+
         # Initialize services
-        self.database_factory = DatabaseFactory()
-        self.ingestion_service = IngestionService(
+        db_config = self.config_manager.load_config().get("database", {})
+        self.database_factory = DatabaseFactory(config=db_config)
+        self.ingestion_service = IngestionApplicationService(
             IngestionDomainService(),
-            self.database_factory.create_database()
+            self.database_factory.client
         )
         
         # Initialize health monitoring

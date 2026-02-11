@@ -5,11 +5,16 @@ services:
     image: cr.weaviate.io/semitechnologies/weaviate:1.31.0
     container_name: varity_weaviate
     ports:
-      - "8080:8080"
-      - "50051:50051"
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:50051:50051"
     environment:
       QUERY_DEFAULTS_LIMIT: 25
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'false'
+      AUTHENTICATION_APIKEY_ENABLED: 'true'
+      AUTHENTICATION_APIKEY_ALLOWED_KEYS: '${WEAVIATE_API_KEY:-default-dev-key}'
+      AUTHENTICATION_APIKEY_USERS: '${WEAVIATE_API_USER:-admin@varity.local}'
+      AUTHORIZATION_ADMINLIST_ENABLED: 'true'
+      AUTHORIZATION_ADMINLIST_USERS: '${WEAVIATE_API_USER:-admin@varity.local}'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
       DEFAULT_VECTORIZER_MODULE: 'none'
       CLUSTER_HOSTNAME: 'node1'
@@ -93,14 +98,15 @@ services:
       - PYTHONUNBUFFERED=1
       - DOCKER_ENV=true
       - NON_INTERACTIVE=true
+      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:-default-dev-key}
     volumes:
       - ./data:/app/data
-      - ./logs:/app/logs
-      - ./src:/app/src
-      - ./config:/app/config
-      - ./scripts:/app/scripts
-      - ./resources:/app/resources
+      - ./config:/app/config:ro
     command: ["/app/scripts/init_ingestion.sh"]
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     restart: "no"
     networks:
       - varity_network
@@ -116,15 +122,18 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:-default-dev-key}
+      - VARITY_API_KEY=${VARITY_API_KEY:-}
     volumes:
       - ./data:/app/data
-      - ./logs:/app/logs
-      - ./src:/app/src
-      - ./config:/app/config
-      - ./resources:/app/resources
+      - ./config:/app/config:ro
     ports:
       - "8000:8000"
     command: sh -c "python -m src.application.services.search_application_service"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     restart: unless-stopped
     networks:
       - varity_network
@@ -145,12 +154,10 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:-default-dev-key}
     volumes:
       - ./data:/app/data
-      - ./logs:/app/logs
-      - ./src:/app/src
-      - ./config:/app/config
-      - ./resources:/app/resources
+      - ./config:/app/config:ro
     networks:
       - varity_network
     # No default command - will be specified when running

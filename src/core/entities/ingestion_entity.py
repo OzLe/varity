@@ -48,12 +48,14 @@ class ProcessingStatus:
 
 
 @dataclass
-class IngestionState:
+class IngestionStateRecord:
     """
-    Represents the state of an ingestion operation.
-    
+    Represents the state record of an ingestion operation.
+
     This class tracks the progress and status of document ingestion,
     including any errors or warnings encountered.
+
+    Note: Renamed from IngestionState to avoid shadowing the IngestionState Enum.
     """
     document_id: str
     status: str
@@ -79,21 +81,29 @@ class IngestionState:
 @dataclass
 class IngestionDecision:
     """
-    Represents a decision made during document ingestion.
-    
-    This class contains the decision made about how to process
-    a document, including any reasons or metadata.
+    Represents a decision about whether ingestion should run.
+
+    Constructed by StateManagementService to communicate ingestion decisions
+    with full context about the current state.
     """
-    action: str  # "process", "transform", or "reject"
-    reason: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    should_run: bool
+    reason: str = ""
+    current_state: Optional['IngestionState'] = None
+    force_required: bool = False
+    existing_classes: List[str] = field(default_factory=list)
+    timestamp: Optional[str] = None
+    is_stale: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert decision to dictionary representation."""
         return {
-            'action': self.action,
+            'should_run': self.should_run,
             'reason': self.reason,
-            'metadata': self.metadata
+            'current_state': self.current_state.value if self.current_state else None,
+            'force_required': self.force_required,
+            'existing_classes': self.existing_classes,
+            'timestamp': self.timestamp,
+            'is_stale': self.is_stale
         }
 
 
@@ -213,8 +223,7 @@ class IngestionProgress:
             'step_progress_percentage': self.step_progress_percentage,
             'progress_display': self.progress_display,
             'step_progress_display': self.step_progress_display,
-            'estimated_time_remaining': self.estimated_time_remaining,
-            'metadata': self.metadata
+            'estimated_time_remaining': self.estimated_time_remaining
         }
 
 

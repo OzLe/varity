@@ -6,7 +6,7 @@ instance lifecycle and disposal.
 """
 
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 from weakref import WeakKeyDictionary
 
 from .service_registry import ServiceLifetime, ServiceRegistration
@@ -29,7 +29,7 @@ class LifetimeManager:
     def get_instance(
         self,
         registration: ServiceRegistration,
-        factory: callable,
+        factory: Callable[..., Any],
         scope: Optional[Any] = None
     ) -> Any:
         """
@@ -76,7 +76,7 @@ class LifetimeManager:
     def _get_scoped_instance(
         self,
         registration: ServiceRegistration,
-        factory: callable,
+        factory: Callable[..., Any],
         scope: Optional[Any]
     ) -> Any:
         """

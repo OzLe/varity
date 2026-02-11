@@ -7,7 +7,6 @@ must follow to ensure consistent external service interaction patterns.
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, TypeVar, Generic
-import numpy as np
 
 T = TypeVar('T')
 
@@ -112,7 +111,7 @@ class VectorDatabaseClientInterface(ABC):
         pass
     
     @abstractmethod
-    def semantic_search(self, class_name: str, query_vector: np.ndarray, limit: int = 10, certainty: float = 0.75) -> List[Dict[str, Any]]:
+    def semantic_search(self, class_name: str, query_vector: List[float], limit: int = 10, certainty: float = 0.75) -> List[Dict[str, Any]]:
         """
         Perform semantic search.
         
@@ -128,7 +127,7 @@ class VectorDatabaseClientInterface(ABC):
         pass
     
     @abstractmethod
-    def batch_create(self, class_name: str, objects: List[Dict[str, Any]], vectors: List[np.ndarray]) -> List[str]:
+    def batch_create(self, class_name: str, objects: List[Dict[str, Any]], vectors: List[List[float]]) -> List[str]:
         """
         Create multiple objects in a batch.
         
@@ -147,28 +146,28 @@ class EmbeddingClientInterface(ABC):
     """Interface for embedding service client operations."""
     
     @abstractmethod
-    def get_embedding(self, text: str) -> np.ndarray:
+    def get_embedding(self, text: str) -> List[float]:
         """
         Get embedding vector for text.
-        
+
         Args:
             text: Text to embed
-            
+
         Returns:
-            np.ndarray: Embedding vector
+            List[float]: Embedding vector
         """
         pass
     
     @abstractmethod
-    def get_embeddings(self, texts: List[str]) -> List[np.ndarray]:
+    def get_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
         Get embedding vectors for multiple texts.
-        
+
         Args:
             texts: List of texts to embed
-            
+
         Returns:
-            List[np.ndarray]: List of embedding vectors
+            List[List[float]]: List of embedding vectors
         """
         pass
     

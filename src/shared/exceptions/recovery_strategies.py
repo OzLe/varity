@@ -129,8 +129,9 @@ class RetryStrategy(RecoveryStrategy[T]):
                     )
                     raise
                 
-                # Wait before retry
-                time.sleep(self.delay)
+                # Wait before retry (async-safe)
+                import asyncio
+                await asyncio.sleep(self.delay)
 
 
 class FallbackStrategy(RecoveryStrategy[T]):

@@ -10,8 +10,8 @@ import os
 from abc import ABC, abstractmethod
 import numpy as np
 
-from ....core.interfaces import ClientInterface
-from ....core.entities import EmbeddingRequest, EmbeddingResponse
+from ...core.interfaces import ClientInterface
+from ...core.entities import EmbeddingRequest, EmbeddingResponse
 
 
 class EmbeddingProvider(ABC):

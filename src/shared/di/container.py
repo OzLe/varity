@@ -6,9 +6,10 @@ service resolution and lifecycle.
 """
 
 import inspect
+from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, get_type_hints
 
-from .lifetime_manager import LifetimeManager, scope_context
+from .lifetime_manager import LifetimeManager
 from .service_registry import ServiceLifetime, ServiceRegistration, ServiceRegistry
 
 T = TypeVar('T')
@@ -165,15 +166,19 @@ class Container:
         scoped_container._current_scope = object()
         return scoped_container
     
-    @scope_context
-    def scope(self) -> 'Container':
+    @contextmanager
+    def scope(self):
         """
-        Create a scoped context.
-        
-        Returns:
+        Create a scoped context manager.
+
+        Yields:
             Container: Container instance with scope
         """
-        return self.create_scope()
+        scoped = self.create_scope()
+        try:
+            yield scoped
+        finally:
+            self._lifetime_manager.dispose_scope(scoped._current_scope)
     
     def _create_factory(
         self,

@@ -98,10 +98,22 @@ class BaseIngestor(ABC):
         pass
 
 class WeaviateIngestor(BaseIngestor):
-    """Weaviate-specific implementation of ESCO data ingestion"""
-    
+    """
+    Weaviate-specific implementation of ESCO data ingestion.
+
+    .. deprecated::
+        Use :class:`~src.infrastructure.ingestion.ingestion_orchestrator.IngestionOrchestrator`
+        for new code. This class is kept as a facade for backwards compatibility.
+    """
+
     def __init__(self, config_path: str = "config/weaviate_config.yaml", profile: str = "default", client: Optional[WeaviateClient] = None):
         """Initialize the Weaviate ingestor."""
+        import warnings
+        warnings.warn(
+            "WeaviateIngestor is deprecated. Use IngestionOrchestrator instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         super().__init__(config_path, profile)
         self.client = client or WeaviateClient(url=os.getenv("WEAVIATE_URL", "http://weaviate:8080"))
         self.embedding_util = ESCOEmbedding()
@@ -307,7 +319,7 @@ class WeaviateIngestor(BaseIngestor):
             return False
 
     def ingest_isco_groups(self):
-        """Ingest ISCO groups into Weaviate"""
+        """Ingest ISCO groups into Weaviate using batch insertion."""
         file_path = os.path.join(self.esco_dir, "ISCOGroups_en.csv")
         if not os.path.exists(file_path):
             logger.warning(f"ISCO groups file not found: {file_path} – skipping.")
@@ -316,55 +328,52 @@ class WeaviateIngestor(BaseIngestor):
         logger.info(f"Ingesting ISCO groups from {file_path}")
 
         def process_batch(batch):
-            for _, row in batch.iterrows():
+            objects = []
+            uuids = []
+            for record in batch.to_dict("records"):
                 try:
                     isco_group_data = {
-                        "uri": row["conceptUri"],
-                        "code": row.get("code", ""),
-                        "preferredLabel_en": row.get("preferredLabel", ""),
-                        "description_en": row.get("description", ""),
-                        "iscoLevel": row.get("iscoLevel", ""),
+                        "uri": record["conceptUri"],
+                        "code": record.get("code", ""),
+                        "preferredLabel_en": record.get("preferredLabel", ""),
+                        "description_en": record.get("description", ""),
+                        "iscoLevel": record.get("iscoLevel", ""),
                     }
-
-                    # Clean empty values
                     isco_group_data = {k: v for k, v in isco_group_data.items() if v is not None and v != ""}
-
-                    # Create UUID from URI
                     uuid = isco_group_data["uri"].split("/")[-1]
-
-                    self.client.add_object(class_name="ISCOGroup", properties=isco_group_data, uuid=uuid)
-
+                    objects.append(isco_group_data)
+                    uuids.append(uuid)
                 except Exception as e:
-                    logger.error(f"Failed to ingest ISCO group {row.get('conceptUri', 'unknown')}: {str(e)}")
-                    continue
+                    logger.error(f"Failed to prepare ISCO group {record.get('conceptUri', 'unknown')}: {e}")
+            if objects:
+                self.client.batch_add_objects("ISCOGroup", objects, uuids)
 
         self.process_csv_in_batches(file_path, process_batch)
         logger.info("ISCO group ingestion completed")
 
     def ingest_occupations(self):
-        """Ingest occupations from CSV file."""
+        """Ingest occupations from CSV file using batch insertion."""
         logger.info("Starting occupation ingestion...")
-        
+
         def process_batch(batch):
-            # Process each occupation
-            for _, row in batch.iterrows():
+            objects = []
+            for record in batch.to_dict("records"):
                 try:
-                    # Create occupation object
+                    alt = record.get("altLabels_en", "")
                     occupation = {
-                        "uri": row["conceptUri"],
-                        "preferredLabel_en": row["preferredLabel_en"],
-                        "description_en": row.get("description_en", ""),
-                        "definition_en": row.get("definition_en", ""),
-                        "code": row.get("code", ""),
-                        "altLabels_en": row.get("altLabels_en", "").split("|") if pd.notna(row.get("altLabels_en")) else []
+                        "uri": record["conceptUri"],
+                        "preferredLabel_en": record["preferredLabel_en"],
+                        "description_en": record.get("description_en", ""),
+                        "definition_en": record.get("definition_en", ""),
+                        "code": record.get("code", ""),
+                        "altLabels_en": alt.split("|") if isinstance(alt, str) and alt else []
                     }
-                    
-                    # Add to repository
-                    self.client.add_object(class_name="Occupation", properties=occupation)
-                    
+                    objects.append(occupation)
                 except Exception as e:
-                    logger.error(f"Error processing occupation {row.get('conceptUri', 'unknown')}: {str(e)}")
-        
+                    logger.error(f"Error preparing occupation {record.get('conceptUri', 'unknown')}: {e}")
+            if objects:
+                self.client.batch_add_objects("Occupation", objects)
+
         def update_heartbeat(processed, total):
             self.client.set_ingestion_metadata(
                 status="in_progress",
@@ -374,36 +383,34 @@ class WeaviateIngestor(BaseIngestor):
                     "last_heartbeat": datetime.utcnow().isoformat()
                 }
             )
-        
-        # Process occupations CSV
+
         occupations_file = os.path.join(self.esco_dir, "occupations_en.csv")
         self.process_csv_in_batches(occupations_file, process_batch, update_heartbeat)
         logger.info("Occupation ingestion completed")
 
     def ingest_skills(self):
-        """Ingest skills from CSV file."""
+        """Ingest skills from CSV file using batch insertion."""
         logger.info("Starting skill ingestion...")
-        
+
         def process_batch(batch):
-            # Process each skill
-            for _, row in batch.iterrows():
+            objects = []
+            for record in batch.to_dict("records"):
                 try:
-                    # Create skill object
+                    alt = record.get("altLabels_en", "")
                     skill = {
-                        "uri": row["conceptUri"],
-                        "preferredLabel_en": row["preferredLabel_en"],
-                        "description_en": row.get("description_en", ""),
-                        "skillType": row.get("skillType", ""),
-                        "reuseLevel": row.get("reuseLevel", ""),
-                        "altLabels_en": row.get("altLabels_en", "").split("|") if pd.notna(row.get("altLabels_en")) else []
+                        "uri": record["conceptUri"],
+                        "preferredLabel_en": record["preferredLabel_en"],
+                        "description_en": record.get("description_en", ""),
+                        "skillType": record.get("skillType", ""),
+                        "reuseLevel": record.get("reuseLevel", ""),
+                        "altLabels_en": alt.split("|") if isinstance(alt, str) and alt else []
                     }
-                    
-                    # Add to repository
-                    self.client.add_object(class_name="Skill", properties=skill)
-                    
+                    objects.append(skill)
                 except Exception as e:
-                    logger.error(f"Error processing skill {row.get('conceptUri', 'unknown')}: {str(e)}")
-        
+                    logger.error(f"Error preparing skill {record.get('conceptUri', 'unknown')}: {e}")
+            if objects:
+                self.client.batch_add_objects("Skill", objects)
+
         def update_heartbeat(processed, total):
             self.client.set_ingestion_metadata(
                 status="in_progress",
@@ -413,14 +420,20 @@ class WeaviateIngestor(BaseIngestor):
                     "last_heartbeat": datetime.utcnow().isoformat()
                 }
             )
-        
-        # Process skills CSV
+
         skills_file = os.path.join(self.esco_dir, "skills_en.csv")
         self.process_csv_in_batches(skills_file, process_batch, update_heartbeat)
         logger.info("Skill ingestion completed")
 
+    def _prefetch_uuids(self, class_name: str) -> set:
+        """Pre-fetch all UUIDs for a class into a set for fast in-memory lookups."""
+        logger.info(f"Pre-fetching UUIDs for {class_name}...")
+        uuids = set(self.client.get_all_uuids(class_name))
+        logger.info(f"Pre-fetched {len(uuids)} UUIDs for {class_name}")
+        return uuids
+
     def create_skill_relations(self):
-        """Create occupation-skill relations"""
+        """Create occupation-skill relations using batch references and pre-fetched UUIDs."""
         file_path = os.path.join(self.esco_dir, "occupationSkillRelations_en.csv")
         if not os.path.exists(file_path):
             logger.warning(f"Occupation-skill relations file not found: {file_path} – skipping.")
@@ -428,59 +441,44 @@ class WeaviateIngestor(BaseIngestor):
 
         logger.info(f"Creating occupation-skill relations from {file_path}")
 
-        df = pd.read_csv(file_path)
-        total_relations = len(df)
+        occupation_uuids = self._prefetch_uuids("Occupation")
+        skill_uuids = self._prefetch_uuids("Skill")
 
-        if total_relations == 0:
+        df = pd.read_csv(file_path)
+        if len(df) == 0:
             logger.warning("No occupation-skill relations found – skipping.")
             return
 
-        with tqdm(total=total_relations, desc="Creating Occupation-Skill Relations", unit="relation") as pbar:
-            for _, row in df.iterrows():
-                try:
-                    # Extract UUIDs from the full URIs
-                    occupation_uuid = row['occupationUri'].split('/')[-1]
-                    skill_uuid = row['skillUri'].split('/')[-1]
-                    relation_type = row.get('relationType', 'related')
+        refs_batch = []
+        skipped = 0
+        for record in tqdm(df.to_dict("records"), desc="Preparing Occupation-Skill Relations", unit="rel"):
+            try:
+                occupation_uuid = record['occupationUri'].split('/')[-1]
+                skill_uuid = record['skillUri'].split('/')[-1]
+                relation_type = record.get('relationType', 'related')
 
-                    # Check if both objects exist before creating relation
-                    occupation_exists = self.client.check_object_exists(class_name="Occupation", uuid=occupation_uuid)
-                    skill_exists = self.client.check_object_exists(class_name="Skill", uuid=skill_uuid)
-
-                    if not occupation_exists:
-                        logger.warning(f"Occupation {occupation_uuid} not found - skipping relation")
-                        continue
-                    if not skill_exists:
-                        logger.warning(f"Skill {skill_uuid} not found - skipping relation")
-                        continue
-
-                    # Add relation based on type
-                    if relation_type == 'essential':
-                        self.client.add_essential_skill_relation(
-                            class_name="Occupation",
-                            uuid=occupation_uuid,
-                            skill_uuid=skill_uuid
-                        )
-                    elif relation_type == 'optional':
-                        self.client.add_optional_skill_relation(
-                            class_name="Occupation",
-                            uuid=occupation_uuid,
-                            skill_uuid=skill_uuid
-                        )
-                    else:
-                        # Default to essential if type is unclear
-                        self.client.add_essential_skill_relation(
-                            class_name="Occupation",
-                            uuid=occupation_uuid,
-                            skill_uuid=skill_uuid
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to create occupation-skill relation: {str(e)}")
+                if occupation_uuid not in occupation_uuids or skill_uuid not in skill_uuids:
+                    skipped += 1
                     continue
-                pbar.update(1)
+
+                ref_prop = "hasEssentialSkill" if relation_type == "essential" else (
+                    "hasOptionalSkill" if relation_type == "optional" else "hasEssentialSkill"
+                )
+                refs_batch.append({
+                    "from_class": "Occupation", "from_uuid": occupation_uuid,
+                    "ref_property": ref_prop,
+                    "to_class": "Skill", "to_uuid": skill_uuid
+                })
+            except Exception as e:
+                logger.error(f"Failed to prepare occupation-skill relation: {e}")
+
+        if refs_batch:
+            logger.info(f"Batch-inserting {len(refs_batch)} occupation-skill references (skipped {skipped})")
+            self.client.batch_add_references(refs_batch)
+        logger.info("Occupation-skill relations completed")
 
     def create_hierarchical_relations(self):
-        """Create hierarchical relations between occupations"""
+        """Create hierarchical relations between occupations using batch references."""
         file_path = os.path.join(self.esco_dir, "broaderRelationsOccPillar_en.csv")
         if not os.path.exists(file_path):
             logger.warning(f"Hierarchical relations file not found: {file_path} – skipping.")
@@ -490,104 +488,93 @@ class WeaviateIngestor(BaseIngestor):
 
         df = pd.read_csv(file_path)
         df = self._standardize_hierarchy_columns(df)
-        
+
         if 'broaderUri' not in df.columns or 'narrowerUri' not in df.columns:
-            logger.warning("Required columns 'broaderUri' and 'narrowerUri' not found – skipping hierarchical relations.")
+            logger.warning("Required columns 'broaderUri' and 'narrowerUri' not found – skipping.")
             return
-
-        total_relations = len(df)
-
-        if total_relations == 0:
+        if len(df) == 0:
             logger.warning("No hierarchical relations found – skipping.")
             return
 
-        with tqdm(total=total_relations, desc="Creating Hierarchical Relations", unit="relation") as pbar:
-            for _, row in df.iterrows():
-                try:
-                    # Extract UUIDs from the full URIs
-                    broader_uuid = row['broaderUri'].split('/')[-1]
-                    narrower_uuid = row['narrowerUri'].split('/')[-1]
+        occupation_uuids = self._prefetch_uuids("Occupation")
 
-                    # Check if both occupations exist before creating relation
-                    broader_exists = self.client.check_object_exists(class_name="Occupation", uuid=broader_uuid)
-                    narrower_exists = self.client.check_object_exists(class_name="Occupation", uuid=narrower_uuid)
-
-                    if not broader_exists:
-                        logger.warning(f"Broader occupation {broader_uuid} not found - skipping relation")
-                        continue
-                    if not narrower_exists:
-                        logger.warning(f"Narrower occupation {narrower_uuid} not found - skipping relation")
-                        continue
-
-                    # Add broader occupation relation
-                    self.client.add_broader_occupation_relation(
-                        class_name="Occupation",
-                        uuid=narrower_uuid,
-                        broader_uuid=broader_uuid
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to create hierarchical relation: {str(e)}")
+        refs_batch = []
+        skipped = 0
+        for record in tqdm(df.to_dict("records"), desc="Preparing Hierarchical Relations", unit="rel"):
+            try:
+                broader_uuid = record['broaderUri'].split('/')[-1]
+                narrower_uuid = record['narrowerUri'].split('/')[-1]
+                if broader_uuid not in occupation_uuids or narrower_uuid not in occupation_uuids:
+                    skipped += 1
                     continue
-                pbar.update(1)
+                refs_batch.append({
+                    "from_class": "Occupation", "from_uuid": narrower_uuid,
+                    "ref_property": "broaderOccupation",
+                    "to_class": "Occupation", "to_uuid": broader_uuid
+                })
+            except Exception as e:
+                logger.error(f"Failed to prepare hierarchical relation: {e}")
+
+        if refs_batch:
+            logger.info(f"Batch-inserting {len(refs_batch)} hierarchical references (skipped {skipped})")
+            self.client.batch_add_references(refs_batch)
+        logger.info("Hierarchical relations completed")
 
     def create_isco_group_relations(self):
-        """Create relations between occupations and ISCO groups"""
+        """Create relations between occupations and ISCO groups using pre-loaded dict."""
         logger.info("Creating ISCO group relations...")
 
-        # Get all occupations and update their ISCO group relations
         try:
-            # We'll iterate through all occupations and link them to their ISCO groups
-            occupations = self.client.get_objects(class_name="Occupation")
-            
-            with tqdm(total=len(occupations), desc="Creating ISCO Group Relations", unit="occupation") as pbar:
-                for occupation in occupations:
-                    try:
-                        isco_code = occupation.get('iscoCode')
-                        if not isco_code:
-                            continue
+            # Pre-load ISCO groups keyed by code
+            isco_groups = self.client.get_objects(class_name="ISCOGroup")
+            isco_by_code = {}
+            for g in isco_groups:
+                code = g.get("code")
+                if code:
+                    isco_by_code[code] = g["_id"]
 
-                        # Find the ISCO group with this code
-                        isco_groups = self.client.get_objects(class_name="ISCOGroup", property="code", value=isco_code)
-                        if isco_groups:
-                            isco_group_uuid = isco_groups[0]['_id']
-                            occupation_uuid = occupation['_id']
-                            
-                            # Add relation
-                            self.client.add_isco_group_relation(
-                                class_name="Occupation",
-                                uuid=occupation_uuid,
-                                isco_group_uuid=isco_group_uuid
-                            )
-                    except Exception as e:
-                        logger.error(f"Failed to create ISCO group relation: {str(e)}")
-                        continue
-                    pbar.update(1)
-                    
+            occupations = self.client.get_objects(class_name="Occupation")
+
+            refs_batch = []
+            for occupation in tqdm(occupations, desc="Preparing ISCO Group Relations", unit="occ"):
+                isco_code = occupation.get("iscoCode")
+                if not isco_code or isco_code not in isco_by_code:
+                    continue
+                refs_batch.append({
+                    "from_class": "Occupation", "from_uuid": occupation["_id"],
+                    "ref_property": "memberOfISCOGroup",
+                    "to_class": "ISCOGroup", "to_uuid": isco_by_code[isco_code]
+                })
+
+            if refs_batch:
+                logger.info(f"Batch-inserting {len(refs_batch)} ISCO group references")
+                self.client.batch_add_references(refs_batch)
+            logger.info("ISCO group relations completed")
+
         except Exception as e:
-            logger.error(f"Error creating ISCO group relations: {str(e)}")
+            logger.error(f"Error creating ISCO group relations: {e}")
 
     def ingest_skill_groups(self):
-        """Ingest skill groups from CSV file."""
+        """Ingest skill groups from CSV file using batch insertion."""
         logger.info("Starting skill group ingestion...")
-        
+
         def process_batch(batch):
-            # Process each skill group
-            for _, row in batch.iterrows():
+            objects = []
+            for record in batch.to_dict("records"):
                 try:
-                    # Create skill group object
+                    alt = record.get("altLabels_en", "")
                     skill_group = {
-                        "uri": row["conceptUri"],
-                        "preferredLabel_en": row["preferredLabel_en"],
-                        "description_en": row.get("description_en", ""),
-                        "altLabels_en": row.get("altLabels_en", "").split("|") if pd.notna(row.get("altLabels_en")) else []
+                        "uri": record["conceptUri"],
+                        "preferredLabel_en": record["preferredLabel_en"],
+                        "description_en": record.get("description_en", ""),
+                        "altLabels_en": alt.split("|") if isinstance(alt, str) and alt else []
                     }
-                    
-                    # Add to repository
-                    self.client.add_object(class_name="SkillGroup", properties=skill_group)
-                    
+                    objects.append(skill_group)
                 except Exception as e:
-                    logger.error(f"Error processing skill group {row.get('conceptUri', 'unknown')}: {str(e)}")
-        
+                    logger.error(f"Error preparing skill group {record.get('conceptUri', 'unknown')}: {e}")
+            if objects:
+                self.client.batch_add_objects("SkillGroup", objects)
+
         def update_heartbeat(processed, total):
             self.client.set_ingestion_metadata(
                 status="in_progress",
@@ -597,34 +584,32 @@ class WeaviateIngestor(BaseIngestor):
                     "last_heartbeat": datetime.utcnow().isoformat()
                 }
             )
-        
-        # Process skill groups CSV
+
         skill_groups_file = os.path.join(self.esco_dir, "skillGroups_en.csv")
         self.process_csv_in_batches(skill_groups_file, process_batch, update_heartbeat)
         logger.info("Skill group ingestion completed")
 
     def ingest_skill_collections(self):
-        """Ingest skill collections from CSV file."""
+        """Ingest skill collections from CSV file using batch insertion."""
         logger.info("Starting skill collection ingestion...")
-        
+
         def process_batch(batch):
-            # Process each skill collection
-            for _, row in batch.iterrows():
+            objects = []
+            for record in batch.to_dict("records"):
                 try:
-                    # Create skill collection object
+                    alt = record.get("altLabels_en", "")
                     collection = {
-                        "uri": row["conceptUri"],
-                        "preferredLabel_en": row["preferredLabel_en"],
-                        "description_en": row.get("description_en", ""),
-                        "altLabels_en": row.get("altLabels_en", "").split("|") if pd.notna(row.get("altLabels_en")) else []
+                        "uri": record["conceptUri"],
+                        "preferredLabel_en": record["preferredLabel_en"],
+                        "description_en": record.get("description_en", ""),
+                        "altLabels_en": alt.split("|") if isinstance(alt, str) and alt else []
                     }
-                    
-                    # Add to repository
-                    self.client.add_object(class_name="SkillCollection", properties=collection)
-                    
+                    objects.append(collection)
                 except Exception as e:
-                    logger.error(f"Error processing skill collection {row.get('conceptUri', 'unknown')}: {str(e)}")
-        
+                    logger.error(f"Error preparing skill collection {record.get('conceptUri', 'unknown')}: {e}")
+            if objects:
+                self.client.batch_add_objects("SkillCollection", objects)
+
         def update_heartbeat(processed, total):
             self.client.set_ingestion_metadata(
                 status="in_progress",
@@ -634,14 +619,13 @@ class WeaviateIngestor(BaseIngestor):
                     "last_heartbeat": datetime.utcnow().isoformat()
                 }
             )
-        
-        # Process skill collections CSV
+
         collections_file = os.path.join(self.esco_dir, "conceptSchemes_en.csv")
         self.process_csv_in_batches(collections_file, process_batch, update_heartbeat)
         logger.info("Skill collection ingestion completed")
 
     def create_skill_collection_relations(self):
-        """Create relations between skills and skill collections"""
+        """Create relations between skills and skill collections using batch references."""
         file_path = os.path.join(self.esco_dir, "skillSkillRelations_en.csv")
         if not os.path.exists(file_path):
             logger.warning(f"Skill collection relations file not found: {file_path} – skipping.")
@@ -655,44 +639,37 @@ class WeaviateIngestor(BaseIngestor):
         if 'conceptSchemeUri' not in df.columns or 'skillUri' not in df.columns:
             logger.warning("Required columns not found in skill collection relations file – skipping.")
             return
-
-        total_relations = len(df)
-
-        if total_relations == 0:
+        if len(df) == 0:
             logger.warning("No skill collection relations found – skipping.")
             return
 
-        with tqdm(total=total_relations, desc="Creating Skill Collection Relations", unit="relation") as pbar:
-            for _, row in df.iterrows():
-                try:
-                    # Extract UUIDs from the full URIs
-                    collection_uuid = row['conceptSchemeUri'].split('/')[-1]
-                    skill_uuid = row['skillUri'].split('/')[-1]
+        collection_uuids = self._prefetch_uuids("SkillCollection")
+        skill_uuids = self._prefetch_uuids("Skill")
 
-                    # Check if both objects exist before creating relation
-                    collection_exists = self.client.check_object_exists(class_name="SkillCollection", uuid=collection_uuid)
-                    skill_exists = self.client.check_object_exists(class_name="Skill", uuid=skill_uuid)
-
-                    if not collection_exists:
-                        logger.warning(f"Skill collection {collection_uuid} not found - skipping relation")
-                        continue
-                    if not skill_exists:
-                        logger.warning(f"Skill {skill_uuid} not found - skipping relation")
-                        continue
-
-                    # Add relation
-                    self.client.add_skill_collection_relation(
-                        class_name="Skill",
-                        uuid=skill_uuid,
-                        collection_uuid=collection_uuid
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to create skill collection relation: {str(e)}")
+        refs_batch = []
+        skipped = 0
+        for record in tqdm(df.to_dict("records"), desc="Preparing Skill Collection Relations", unit="rel"):
+            try:
+                collection_uuid = record['conceptSchemeUri'].split('/')[-1]
+                skill_uuid = record['skillUri'].split('/')[-1]
+                if collection_uuid not in collection_uuids or skill_uuid not in skill_uuids:
+                    skipped += 1
                     continue
-                pbar.update(1)
+                refs_batch.append({
+                    "from_class": "Skill", "from_uuid": skill_uuid,
+                    "ref_property": "memberOfSkillCollection",
+                    "to_class": "SkillCollection", "to_uuid": collection_uuid
+                })
+            except Exception as e:
+                logger.error(f"Failed to prepare skill collection relation: {e}")
+
+        if refs_batch:
+            logger.info(f"Batch-inserting {len(refs_batch)} skill-collection references (skipped {skipped})")
+            self.client.batch_add_references(refs_batch)
+        logger.info("Skill collection relations completed")
 
     def create_skill_skill_relations(self):
-        """Create skill-to-skill relations"""
+        """Create skill-to-skill relations using batch references."""
         file_path = os.path.join(self.esco_dir, "skillSkillRelations_en.csv")
         if not os.path.exists(file_path):
             logger.warning(f"Skill-skill relations file not found: {file_path} – skipping.")
@@ -701,45 +678,36 @@ class WeaviateIngestor(BaseIngestor):
         logger.info(f"Creating skill-skill relations from {file_path}")
 
         df = pd.read_csv(file_path)
-        total_relations = len(df)
-
-        if total_relations == 0:
+        if len(df) == 0:
             logger.warning("No skill-skill relations found – skipping.")
             return
 
-        with tqdm(total=total_relations, desc="Creating Skill-Skill Relations", unit="relation") as pbar:
-            for _, row in df.iterrows():
-                try:
-                    # Extract UUIDs from the full URIs
-                    skill_uuid = row['skillUri'].split('/')[-1]
-                    related_uuid = row['relatedSkillUri'].split('/')[-1]
-                    relation_type = row.get('relationType', 'related')
+        skill_uuids = self._prefetch_uuids("Skill")
 
-                    # Check if both skills exist before creating relation
-                    skill_exists = self.client.check_object_exists(class_name="Skill", uuid=skill_uuid)
-                    related_exists = self.client.check_object_exists(class_name="Skill", uuid=related_uuid)
-
-                    if not skill_exists:
-                        logger.warning(f"Skill {skill_uuid} not found - skipping relation")
-                        continue
-                    if not related_exists:
-                        logger.warning(f"Related skill {related_uuid} not found - skipping relation")
-                        continue
-
-                    # Add relation
-                    self.client.add_related_skill_relation(
-                        class_name="Skill",
-                        uuid=skill_uuid,
-                        related_uuid=related_uuid,
-                        relation_type=relation_type
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to create skill-skill relation: {str(e)}")
+        refs_batch = []
+        skipped = 0
+        for record in tqdm(df.to_dict("records"), desc="Preparing Skill-Skill Relations", unit="rel"):
+            try:
+                skill_uuid = record['skillUri'].split('/')[-1]
+                related_uuid = record['relatedSkillUri'].split('/')[-1]
+                if skill_uuid not in skill_uuids or related_uuid not in skill_uuids:
+                    skipped += 1
                     continue
-                pbar.update(1)
+                refs_batch.append({
+                    "from_class": "Skill", "from_uuid": skill_uuid,
+                    "ref_property": "hasRelatedSkill",
+                    "to_class": "Skill", "to_uuid": related_uuid
+                })
+            except Exception as e:
+                logger.error(f"Failed to prepare skill-skill relation: {e}")
+
+        if refs_batch:
+            logger.info(f"Batch-inserting {len(refs_batch)} skill-skill references (skipped {skipped})")
+            self.client.batch_add_references(refs_batch)
+        logger.info("Skill-skill relations completed")
 
     def create_broader_skill_relations(self):
-        """Create broader skill relations"""
+        """Create broader skill relations using batch references."""
         file_path = os.path.join(self.esco_dir, "broaderRelationsSkillPillar_en.csv")
         if not os.path.exists(file_path):
             logger.warning(f"Broader skill relations file not found: {file_path} – skipping.")
@@ -753,62 +721,67 @@ class WeaviateIngestor(BaseIngestor):
         if 'broaderUri' not in df.columns or 'conceptUri' not in df.columns:
             logger.warning("Required columns not found in broader skill relations file – skipping.")
             return
-
-        total_relations = len(df)
-
-        if total_relations == 0:
+        if len(df) == 0:
             logger.warning("No valid relations found in broader relations file – skipping.")
             return
 
-        with tqdm(total=total_relations, desc="Creating Broader Skill Relations", unit="relation") as pbar:
-            for _, row in df.iterrows():
-                try:
-                    # Extract UUIDs from the full URIs
-                    skill_uuid = row['conceptUri'].split('/')[-1]
-                    broader_uuid = row['broaderUri'].split('/')[-1]
+        skill_uuids = self._prefetch_uuids("Skill")
 
-                    # Check if both skills exist before creating relation
-                    skill_exists = self.client.check_object_exists(class_name="Skill", uuid=skill_uuid)
-                    broader_exists = self.client.check_object_exists(class_name="Skill", uuid=broader_uuid)
-
-                    if not skill_exists:
-                        logger.warning(f"Skill {skill_uuid} not found - skipping relation")
-                        continue
-                    if not broader_exists:
-                        logger.warning(f"Broader skill {broader_uuid} not found - skipping relation")
-                        continue
-
-                    # Add relation
-                    self.client.add_broader_skill_relation(
-                        class_name="Skill",
-                        uuid=skill_uuid,
-                        broader_uuid=broader_uuid
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to add broader skill relation: {str(e)}")
+        refs_batch = []
+        skipped = 0
+        for record in tqdm(df.to_dict("records"), desc="Preparing Broader Skill Relations", unit="rel"):
+            try:
+                skill_uuid = record['conceptUri'].split('/')[-1]
+                broader_uuid = record['broaderUri'].split('/')[-1]
+                if skill_uuid not in skill_uuids or broader_uuid not in skill_uuids:
+                    skipped += 1
                     continue
-                pbar.update(1)
+                refs_batch.append({
+                    "from_class": "Skill", "from_uuid": skill_uuid,
+                    "ref_property": "broaderSkill",
+                    "to_class": "Skill", "to_uuid": broader_uuid
+                })
+            except Exception as e:
+                logger.error(f"Failed to prepare broader skill relation: {e}")
+
+        if refs_batch:
+            logger.info(f"Batch-inserting {len(refs_batch)} broader-skill references (skipped {skipped})")
+            self.client.batch_add_references(refs_batch)
+        logger.info("Broader skill relations completed")
 
     def run_simple_ingestion(self):
         """
         Run a simplified ingestion process for all entities and relationships.
-        
-        This method contains only the data access operations without any
-        business logic, status management, or user interaction.
+
+        Delegates to IngestionOrchestrator when available, falls back to
+        the legacy inline implementation.
         """
         try:
-            logger.info("Starting simple ingestion process")
-            
+            from src.infrastructure.ingestion.ingestion_orchestrator import IngestionOrchestrator
+            logger.info("Delegating to IngestionOrchestrator")
+            orchestrator = IngestionOrchestrator(
+                client=self.client,
+                data_dir=self.esco_dir,
+                batch_size=self.batch_size,
+            )
+            orchestrator.run_complete_ingestion()
+            return
+        except ImportError:
+            logger.info("IngestionOrchestrator not available, using legacy path")
+
+        try:
+            logger.info("Starting simple ingestion process (legacy)")
+
             # Initialize schema
             self.initialize_schema()
-            
+
             # Ingest all entities
             self.ingest_isco_groups()
             self.ingest_occupations()
             self.ingest_skills()
             self.ingest_skill_groups()
             self.ingest_skill_collections()
-            
+
             # Create all relationships
             self.create_skill_relations()
             self.create_hierarchical_relations()
@@ -816,9 +789,9 @@ class WeaviateIngestor(BaseIngestor):
             self.create_skill_collection_relations()
             self.create_skill_skill_relations()
             self.create_broader_skill_relations()
-            
+
             logger.info("Simple ingestion process completed")
-            
+
         except Exception as e:
             logger.error(f"Simple ingestion process failed: {str(e)}")
             raise

@@ -14,8 +14,8 @@ from ..services.search_application_service import SearchApplicationService
 
 
 @dataclass
-class SearchQuery:
-    """Query to search documents."""
+class SearchCommand:
+    """Command wrapping a search query with optional metadata."""
     query: SearchQuery
     metadata: Optional[Dict[str, Any]] = None
 
@@ -46,7 +46,7 @@ class SearchHandler:
     
     async def handle_search(
         self,
-        query: SearchQuery
+        query: SearchCommand
     ) -> SearchResponse:
         """
         Handle search query.

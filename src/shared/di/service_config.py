@@ -10,26 +10,25 @@ from typing import Optional
 from .container import Container
 from .service_registry import ServiceLifetime
 
-from infrastructure.config.config_manager import ConfigManager
-from infrastructure.database.factory import DatabaseFactory
-from infrastructure.database.weaviate.weaviate_client import WeaviateClient
-from infrastructure.database.weaviate.repositories.document_repository import WeaviateDocumentRepository
-from infrastructure.external.translation_client import TranslationClient
-from infrastructure.external.embedding_client import EmbeddingClient
-from infrastructure.external.model_manager import ModelManager
+from ...infrastructure.config.config_manager import ConfigManager
+from ...infrastructure.database.factory import DatabaseFactory
+from ...infrastructure.database.weaviate.weaviate_client import WeaviateClient
+from ...infrastructure.database.weaviate.repositories.document_repository import WeaviateDocumentRepository
+from ...infrastructure.external.translation_client import TranslationClient
+from ...infrastructure.external.embedding_client import EmbeddingClient
+from ...infrastructure.external.model_manager import ModelManager
 
-from services.ingestion_service import IngestionService
-from services.search_service import SearchService
-from services.validation_service import ValidationService
+from ...application.services.ingestion_application_service import IngestionApplicationService
+from ...application.services.search_application_service import SearchApplicationService
 
-from presentation.cli.formatters.output_formatter import OutputFormatter
-from presentation.cli.handlers.cli_handler import CLIApplication
-from presentation.cli.commands.ingestion_commands import (
+from ...presentation.cli.formatters.output_formatter import OutputFormatter
+from ...presentation.cli.handlers.cli_handler import CLIApplication
+from ...presentation.cli.commands.ingestion_commands import (
     IngestCommand,
     ValidateCommand,
     StatusCommand
 )
-from presentation.cli.commands.search_commands import (
+from ...presentation.cli.commands.search_commands import (
     SearchCommand,
     FilterCommand,
     StatsCommand
@@ -87,8 +86,8 @@ def configure_services(
     
     # Application services
     container.register_transient(
-        IngestionService,
-        lambda: IngestionService(
+        IngestionApplicationService,
+        lambda: IngestionApplicationService(
             config_manager=container.resolve(ConfigManager),
             document_repository=container.resolve(WeaviateDocumentRepository),
             translation_client=container.resolve(TranslationClient),
@@ -96,19 +95,12 @@ def configure_services(
             model_manager=container.resolve(ModelManager)
         )
     )
-    
+
     container.register_transient(
-        SearchService,
-        lambda: SearchService(
+        SearchApplicationService,
+        lambda: SearchApplicationService(
             document_repository=container.resolve(WeaviateDocumentRepository),
             embedding_client=container.resolve(EmbeddingClient)
-        )
-    )
-    
-    container.register_transient(
-        ValidationService,
-        lambda: ValidationService(
-            document_repository=container.resolve(WeaviateDocumentRepository)
         )
     )
     
@@ -126,30 +118,30 @@ def configure_services(
     # CLI Commands
     container.register_transient(
         IngestCommand,
-        lambda: IngestCommand(container.resolve(IngestionService))
+        lambda: IngestCommand(container.resolve(IngestionApplicationService))
     )
-    
+
     container.register_transient(
         ValidateCommand,
-        lambda: ValidateCommand(container.resolve(ValidationService))
+        lambda: ValidateCommand(container.resolve(IngestionApplicationService))
     )
-    
+
     container.register_transient(
         StatusCommand,
-        lambda: StatusCommand(container.resolve(IngestionService))
+        lambda: StatusCommand(container.resolve(IngestionApplicationService))
     )
-    
+
     container.register_transient(
         SearchCommand,
-        lambda: SearchCommand(container.resolve(SearchService))
+        lambda: SearchCommand(container.resolve(SearchApplicationService))
     )
-    
+
     container.register_transient(
         FilterCommand,
-        lambda: FilterCommand(container.resolve(SearchService))
+        lambda: FilterCommand(container.resolve(SearchApplicationService))
     )
-    
+
     container.register_transient(
         StatsCommand,
-        lambda: StatsCommand(container.resolve(SearchService))
+        lambda: StatsCommand(container.resolve(SearchApplicationService))
     ) 

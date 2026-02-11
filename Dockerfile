@@ -26,15 +26,20 @@ RUN mkdir -p /app/data/esco /app/logs
 # Install the package in development mode
 RUN pip install -e .
 
+# Create non-root user
+RUN groupadd -r varity && useradd -r -g varity varity
+RUN chown -R varity:varity /app
+USER varity
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV WEAVIATE_URL=http://weaviate:8080
-ENV TORCH_DEVICE=mps
+ENV TORCH_DEVICE=cpu
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/v1/.well-known/ready || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
 
 # Default command (can be overridden by docker-compose)
 CMD ["python", "-m", "src.application.services.search_application_service"]

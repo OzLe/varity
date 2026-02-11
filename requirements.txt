@@ -23,5 +23,8 @@ protobuf==3.20.3
 # Note: Install these only if using M1/M2/M3 Mac
 # torch-mps  # Available through conda: conda install pytorch -c pytorch
 
+# Web framework
+flask==3.0.0
+
 # Additional dependencies
 pillow==10.3.0

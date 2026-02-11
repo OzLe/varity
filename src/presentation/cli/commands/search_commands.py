@@ -9,7 +9,7 @@ from datetime import datetime
 
 from ...cli.handlers.cli_handler import CommandHandler, CommandResult
 from ...cli.formatters.output_formatter import OutputFormatter
-from ....application.services.search_service import SearchService
+from ....application.services.search_application_service import SearchApplicationService
 from ....domain.search.search_domain_service import SearchDomainService
 from ....infrastructure.database.factory import DatabaseFactory
 
@@ -25,7 +25,7 @@ class SearchCommand(CommandHandler):
     def __init__(
         self,
         formatter: OutputFormatter,
-        search_service: Optional[SearchService] = None
+        search_service: Optional[SearchApplicationService] = None
     ):
         """
         Initialize the handler.
@@ -35,7 +35,7 @@ class SearchCommand(CommandHandler):
             search_service: Optional search service
         """
         super().__init__(formatter)
-        self.search_service = search_service or SearchService(
+        self.search_service = search_service or SearchApplicationService(
             SearchDomainService(),
             DatabaseFactory.create_database()
         )
@@ -118,7 +118,7 @@ class FilterCommand(CommandHandler):
     def __init__(
         self,
         formatter: OutputFormatter,
-        search_service: Optional[SearchService] = None
+        search_service: Optional[SearchApplicationService] = None
     ):
         """
         Initialize the handler.
@@ -128,7 +128,7 @@ class FilterCommand(CommandHandler):
             search_service: Optional search service
         """
         super().__init__(formatter)
-        self.search_service = search_service or SearchService(
+        self.search_service = search_service or SearchApplicationService(
             SearchDomainService(),
             DatabaseFactory.create_database()
         )
@@ -207,7 +207,7 @@ class StatsCommand(CommandHandler):
     def __init__(
         self,
         formatter: OutputFormatter,
-        search_service: Optional[SearchService] = None
+        search_service: Optional[SearchApplicationService] = None
     ):
         """
         Initialize the handler.
@@ -217,7 +217,7 @@ class StatsCommand(CommandHandler):
             search_service: Optional search service
         """
         super().__init__(formatter)
-        self.search_service = search_service or SearchService(
+        self.search_service = search_service or SearchApplicationService(
             SearchDomainService(),
             DatabaseFactory.create_database()
         )

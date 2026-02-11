@@ -139,7 +139,7 @@ class HealthChecker:
         """
         try:
             # Get CPU usage
-            cpu_percent = psutil.cpu_percent(interval=1)
+            cpu_percent = psutil.cpu_percent(interval=None)
             
             # Get memory usage
             memory = psutil.virtual_memory()

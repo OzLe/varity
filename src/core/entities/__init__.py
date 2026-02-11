@@ -8,6 +8,7 @@ the application.
 from .esco_entity import ESCOEntity
 from .ingestion_entity import (
     IngestionState,
+    IngestionStateRecord,
     IngestionDecision,
     IngestionProgress,
     IngestionResult,
@@ -20,11 +21,18 @@ from .search_entity import (
     SearchResult,
     SearchResponse
 )
-from .document_entity import Document
+from .document_entity import (
+    Document,
+    TranslationRequest,
+    TranslationResponse,
+    EmbeddingRequest,
+    EmbeddingResponse
+)
 
 __all__ = [
     'ESCOEntity',
     'IngestionState',
+    'IngestionStateRecord',
     'IngestionDecision',
     'IngestionProgress',
     'IngestionResult',
@@ -34,5 +42,9 @@ __all__ = [
     'SearchQuery',
     'SearchResult',
     'SearchResponse',
-    'Document'
+    'Document',
+    'TranslationRequest',
+    'TranslationResponse',
+    'EmbeddingRequest',
+    'EmbeddingResponse'
 ] 

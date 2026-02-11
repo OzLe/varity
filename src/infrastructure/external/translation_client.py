@@ -9,8 +9,8 @@ from typing import Dict, Any, List, Optional
 import os
 from abc import ABC, abstractmethod
 
-from ....core.interfaces import ClientInterface
-from ....core.entities import TranslationRequest, TranslationResponse
+from ...core.interfaces import ClientInterface
+from ...core.entities import TranslationRequest, TranslationResponse
 
 
 class TranslationProvider(ABC):

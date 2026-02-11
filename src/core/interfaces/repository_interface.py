@@ -7,7 +7,6 @@ must follow to ensure consistent data access patterns across the application.
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, TypeVar, Generic
-import numpy as np
 
 T = TypeVar('T')
 
@@ -89,7 +88,7 @@ class RepositoryInterface(Generic[T], ABC):
         pass
     
     @abstractmethod
-    def search(self, query_vector: np.ndarray, limit: int = 10, certainty: float = 0.75) -> List[T]:
+    def search(self, query_vector: List[float], limit: int = 10, certainty: float = 0.75) -> List[T]:
         """
         Perform semantic search using a query vector.
         
@@ -107,7 +106,7 @@ class RepositoryInterface(Generic[T], ABC):
         pass
     
     @abstractmethod
-    def batch_create(self, data_list: List[Dict[str, Any]], vectors: List[np.ndarray]) -> List[str]:
+    def batch_create(self, data_list: List[Dict[str, Any]], vectors: List[List[float]]) -> List[str]:
         """
         Create multiple entities in a batch.
         

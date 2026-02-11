@@ -6,7 +6,6 @@ separated from infrastructure concerns.
 """
 
 from typing import List, Dict, Any, Optional
-import numpy as np
 
 from ...core.entities import (
     SearchQuery,

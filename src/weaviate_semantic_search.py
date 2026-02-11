@@ -1,3 +1,4 @@
+import os
 import re
 from typing import List, Dict, Optional, Any, Tuple
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from src.infrastructure.database.weaviate.weaviate_client import WeaviateClient
 import torch
 import numpy as np
 import json
+import yaml
 
 logger = configure_logging()
 
@@ -101,10 +103,23 @@ class JobPostingProcessor:
 class VaritySemanticSearch:
     def __init__(self, config_path: str = "config/weaviate_config.yaml", profile: str = "default"):
         """Initialize the semantic search with configuration."""
-        self.client = WeaviateClient(config_path, profile)
+        # Load config to extract Weaviate URL
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+        profile_config = config.get(profile, config.get("default", {}))
+        weaviate_url = profile_config.get("weaviate", {}).get(
+            "url", os.getenv("WEAVIATE_URL", "http://localhost:8080")
+        )
+
+        # Build auth from environment if available
+        import weaviate as _weaviate
+        weaviate_api_key = os.getenv("WEAVIATE_API_KEY")
+        auth = _weaviate.AuthApiKey(api_key=weaviate_api_key) if weaviate_api_key else None
+
+        self.client = WeaviateClient(url=weaviate_url, auth_client_secret=auth)
         self.model = SentenceTransformer('all-MiniLM-L6-v2', device=self._get_device())
         self.job_processor = JobPostingProcessor()
-        
+
         # Initialize repositories
         self.skill_repo = self.client.get_repository("Skill")
         self.occupation_repo = self.client.get_repository("Occupation")

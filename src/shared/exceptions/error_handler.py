@@ -5,10 +5,8 @@ This module provides centralized error handling and management
 across the application.
 """
 
-from typing import Any, Callable, Dict, Optional, Type, TypeVar, Generic
+from typing import Any, Callable, Dict, Optional, Type, TypeVar
 from functools import wraps
-import asyncio
-import traceback
 
 from .error_context import ErrorContext, ErrorContextManager
 from .recovery_strategies import RecoveryStrategy
