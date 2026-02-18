@@ -1,6 +1,6 @@
 class: SkillCollection
 vectorizer: none
-vectorIndexConfig: ${vector_index_config}
+vectorSearch: false
 properties:
   - name: conceptUri
     dataType: [string]

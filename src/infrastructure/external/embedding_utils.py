@@ -18,7 +18,7 @@ class ESCOEmbedding:
     
     def __init__(
         self,
-        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        model_name: str = "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
         device: Optional[str] = None
     ):
         """

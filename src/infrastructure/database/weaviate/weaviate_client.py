@@ -76,6 +76,21 @@ class WeaviateClient(ClientInterface):
             additional_headers=additional_headers
         )
 
+    @staticmethod
+    def _batch_error_callback(results: Optional[List[Dict[str, Any]]]) -> None:
+        """Log errors from batch operations.
+
+        The v3 client passes a list of result dicts when the batch flushes.
+        Each dict has a ``result`` key that may contain ``errors``.
+        """
+        if results is None:
+            return
+        for item in results:
+            if isinstance(item, dict):
+                errors = item.get("result", {}).get("errors")
+                if errors:
+                    logger.error("Batch operation error: %s", errors)
+
     # ------------------------------------------------------------------ #
     # Connection helpers
     # ------------------------------------------------------------------ #
@@ -112,8 +127,10 @@ class WeaviateClient(ClientInterface):
         uuids: Optional[List[Optional[str]]] = None
     ) -> None:
         """Insert multiple objects in a single Weaviate batch call."""
-        with self.client.batch as batch:
-            batch.batch_size = 100
+        with self.client.batch(
+            batch_size=100,
+            callback=self._batch_error_callback,
+        ) as batch:
             for idx, props in enumerate(objects):
                 uid = uuids[idx] if uuids and idx < len(uuids) else None
                 batch.add_data_object(
@@ -132,8 +149,10 @@ class WeaviateClient(ClientInterface):
         Each entry in *references* must be a dict with keys:
         from_class, from_uuid, ref_property, to_class, to_uuid.
         """
-        with self.client.batch as batch:
-            batch.batch_size = 100
+        with self.client.batch(
+            batch_size=100,
+            callback=self._batch_error_callback,
+        ) as batch:
             for ref in references:
                 batch.add_reference(
                     from_object_class_name=ref["from_class"],
@@ -289,8 +308,18 @@ class WeaviateClient(ClientInterface):
     # Schema management
     # ------------------------------------------------------------------ #
 
-    def ensure_schema(self) -> None:
-        """Create the full ESCO schema from resources/schemas/*.yaml if missing."""
+    def ensure_schema(
+        self,
+        vector_index_config: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Create the full ESCO schema from resources/schemas/*.yaml if missing.
+
+        Args:
+            vector_index_config: HNSW vector index settings (distance,
+                efConstruction, maxConnections, ef) applied to classes that
+                have ``vectorSearch: true`` in their schema YAML.  Classes
+                with ``vectorSearch: false`` get their vector index skipped.
+        """
         existing = self.client.schema.get()
         existing_names = {c["class"] for c in existing.get("classes", [])}
 
@@ -305,6 +334,18 @@ class WeaviateClient(ClientInterface):
         if os.path.exists(refs_path):
             with open(refs_path, "r") as f:
                 references = yaml.safe_load(f) or {}
+
+        # Build the vectorIndexConfig dict for Weaviate
+        vic = vector_index_config or {}
+        hnsw_config: Dict[str, Any] = {}
+        if "distance" in vic:
+            hnsw_config["distance"] = vic["distance"]
+        if "efConstruction" in vic:
+            hnsw_config["efConstruction"] = vic["efConstruction"]
+        if "maxConnections" in vic:
+            hnsw_config["maxConnections"] = vic["maxConnections"]
+        if "ef" in vic:
+            hnsw_config["ef"] = vic["ef"]
 
         # Load and create each class schema
         schema_files = [
@@ -334,6 +375,14 @@ class WeaviateClient(ClientInterface):
                 "vectorizer": schema_def.get("vectorizer", "none"),
                 "properties": [],
             }
+
+            # Apply vectorIndexConfig based on schema's vectorSearch flag
+            needs_vector_search = schema_def.get("vectorSearch", False)
+            if needs_vector_search and hnsw_config:
+                class_obj["vectorIndexConfig"] = hnsw_config
+            elif not needs_vector_search:
+                # Skip vector indexing entirely for non-searchable classes
+                class_obj["vectorIndexConfig"] = {"skip": True}
 
             # Add properties
             for prop in schema_def.get("properties", []):
@@ -550,8 +599,10 @@ class WeaviateClient(ClientInterface):
         objects: List[Dict[str, Any]]
     ) -> List[str]:
         """Create multiple objects in batch (async interface)."""
-        with self.client.batch as batch:
-            batch.batch_size = 100
+        with self.client.batch(
+            batch_size=100,
+            callback=self._batch_error_callback,
+        ) as batch:
             object_ids = []
 
             for obj in objects:
@@ -571,8 +622,10 @@ class WeaviateClient(ClientInterface):
         object_ids: List[str]
     ) -> None:
         """Delete multiple objects in batch (async interface)."""
-        with self.client.batch as batch:
-            batch.batch_size = 100
+        with self.client.batch(
+            batch_size=100,
+            callback=self._batch_error_callback,
+        ) as batch:
 
             for object_id in object_ids:
                 batch.delete_data_object(

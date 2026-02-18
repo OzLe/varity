@@ -4,6 +4,7 @@ Flask-based HTTP entry point for the Varity search service.
 Provides /health, /search, and /enrich endpoints.
 """
 
+import hmac
 import logging
 import os
 from typing import List, Dict, Any
@@ -31,7 +32,7 @@ def _create_app():
     # ----- CORS -----
     @app.after_request
     def _add_cors_headers(response):
-        allowed_origins = os.getenv("VARITY_CORS_ORIGINS", "*")
+        allowed_origins = os.getenv("VARITY_CORS_ORIGINS", "http://localhost:8000")
         response.headers["Access-Control-Allow-Origin"] = allowed_origins
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
@@ -66,7 +67,7 @@ def _create_app():
                 token = auth_header[7:]
             else:
                 token = auth_header
-            if token != api_key:
+            if not hmac.compare_digest(token, api_key):
                 return jsonify({"error": "Unauthorized"}), 401
             return f(*args, **kwargs)
         return decorated
@@ -170,13 +171,21 @@ def _create_app():
 
 
 def main():
-    """Entry point for the search service."""
+    """Entry point for the search service (development only).
+
+    In production, use gunicorn:
+        gunicorn -w 2 --threads 4 -b 0.0.0.0:8000 --timeout 120 \\
+            "src.application.services.search_application_service:_create_app()"
+    """
     port = int(os.getenv("VARITY_SEARCH_PORT", "8000"))
     host = os.getenv("VARITY_SEARCH_HOST", "0.0.0.0")
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
     app = _create_app()
-    logger.info(f"Starting Varity search service on {host}:{port}")
+    logger.warning(
+        "Running with Flask development server. "
+        "Use gunicorn for production deployments."
+    )
     app.run(host=host, port=port, debug=debug)
 
 

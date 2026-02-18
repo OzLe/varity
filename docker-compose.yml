@@ -11,7 +11,7 @@ services:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'false'
       AUTHENTICATION_APIKEY_ENABLED: 'true'
-      AUTHENTICATION_APIKEY_ALLOWED_KEYS: '${WEAVIATE_API_KEY:-default-dev-key}'
+      AUTHENTICATION_APIKEY_ALLOWED_KEYS: '${WEAVIATE_API_KEY:?WEAVIATE_API_KEY must be set}'
       AUTHENTICATION_APIKEY_USERS: '${WEAVIATE_API_USER:-admin@varity.local}'
       AUTHORIZATION_ADMINLIST_ENABLED: 'true'
       AUTHORIZATION_ADMINLIST_USERS: '${WEAVIATE_API_USER:-admin@varity.local}'
@@ -38,29 +38,34 @@ services:
     networks:
       - varity_network
 
-  t2v-transformers:
-    image: ${TRANSFORMER_IMAGE:-semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2}
-    container_name: varity_transformers
-    environment:
-      - ENABLE_CUDA=0
-      - HF_HOME=/app/cache
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-    volumes:
-      - transformers_cache:/app/cache
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/.well-known/ready')"]
-      interval: 30s
-      timeout: 30s
-      retries: 5
-      start_period: 120s
-    restart: unless-stopped
-    networks:
-      - varity_network
+  # NOTE: t2v-transformers is currently unused because all schema classes
+  # set vectorizer=none and embeddings are generated in-process via
+  # sentence-transformers. Uncomment if switching to Weaviate's built-in
+  # text2vec-transformers module.
+  #
+  # t2v-transformers:
+  #   image: ${TRANSFORMER_IMAGE:-semitechnologies/transformers-inference:sentence-transformers-multi-qa-MiniLM-L6-cos-v1}
+  #   container_name: varity_transformers
+  #   environment:
+  #     - ENABLE_CUDA=0
+  #     - HF_HOME=/app/cache
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 2G
+  #       reservations:
+  #         memory: 1G
+  #   volumes:
+  #     - transformers_cache:/app/cache
+  #   healthcheck:
+  #     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/.well-known/ready')"]
+  #     interval: 30s
+  #     timeout: 30s
+  #     retries: 5
+  #     start_period: 120s
+  #   restart: unless-stopped
+  #   networks:
+  #     - varity_network
 
 #  varity-ingest:
 #    build: .
@@ -91,14 +96,12 @@ services:
     depends_on:
       weaviate:
         condition: service_healthy
-      t2v-transformers:
-        condition: service_healthy
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
       - DOCKER_ENV=true
       - NON_INTERACTIVE=true
-      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:-default-dev-key}
+      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:?WEAVIATE_API_KEY must be set}
     volumes:
       - ./data:/app/data
       - ./config:/app/config:ro
@@ -117,19 +120,17 @@ services:
     depends_on:
       weaviate:
         condition: service_healthy
-      t2v-transformers:
-        condition: service_healthy
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
-      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:-default-dev-key}
+      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:?WEAVIATE_API_KEY must be set}
       - VARITY_API_KEY=${VARITY_API_KEY:-}
     volumes:
       - ./data:/app/data
       - ./config:/app/config:ro
     ports:
       - "8000:8000"
-    command: sh -c "python -m src.application.services.search_application_service"
+    command: sh -c "gunicorn -w 2 --threads 4 -b 0.0.0.0:8000 --timeout 120 --preload 'src.application.services.search_application_service:_create_app()'"
     deploy:
       resources:
         limits:
@@ -149,12 +150,10 @@ services:
     depends_on:
       weaviate:
         condition: service_healthy
-      t2v-transformers:
-        condition: service_healthy
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
-      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:-default-dev-key}
+      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:?WEAVIATE_API_KEY must be set}
     volumes:
       - ./data:/app/data
       - ./config:/app/config:ro
@@ -168,4 +167,3 @@ networks:
 
 volumes:
   weaviate_data:
-  transformers_cache:

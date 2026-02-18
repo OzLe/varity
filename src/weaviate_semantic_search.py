@@ -117,7 +117,11 @@ class VaritySemanticSearch:
         auth = _weaviate.AuthApiKey(api_key=weaviate_api_key) if weaviate_api_key else None
 
         self.client = WeaviateClient(url=weaviate_url, auth_client_secret=auth)
-        self.model = SentenceTransformer('all-MiniLM-L6-v2', device=self._get_device())
+        embedding_model = profile_config.get("model", {}).get(
+            "embedding_model", "sentence-transformers/multi-qa-MiniLM-L6-cos-v1"
+        )
+        self.model = SentenceTransformer(embedding_model, device=self._get_device())
+        self.embedding_model_name = embedding_model
         self.job_processor = JobPostingProcessor()
 
         # Initialize repositories
@@ -515,7 +519,7 @@ class VaritySemanticSearch:
         # Prepare enrichment metadata
         enrichment_metadata = {
             "extraction_method": "semantic_similarity",
-            "model_used": "all-MiniLM-L6-v2",
+            "model_used": self.embedding_model_name,
             "extracted_text_skills": extracted_text_skills,
             "categorized_requirements": categorized_requirements,
             "occupation_profiles_count": len(occupation_profiles),

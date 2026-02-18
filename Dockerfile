@@ -42,6 +42,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
 
 # Default command (can be overridden by docker-compose)
-CMD ["python", "-m", "src.application.services.search_application_service"]
+CMD ["gunicorn", "-w", "2", "--threads", "4", "-b", "0.0.0.0:8000", "--timeout", "120", "--preload", "src.application.services.search_application_service:_create_app()"]
 
 # The rest of the configuration will be handled by docker-compose 

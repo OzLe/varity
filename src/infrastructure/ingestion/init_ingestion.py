@@ -76,11 +76,23 @@ def init_ingestion():
             logger.error("Failed to connect to Weaviate after multiple attempts")
             return 3
 
+        # Load config to get vector_index_config
+        import yaml as _yaml
+        config_path = os.getenv("VARITY_CONFIG", "/app/config/weaviate_config.yaml")
+        profile = os.getenv("VARITY_PROFILE", "default")
+        vector_index_config = {}
+        try:
+            with open(config_path, "r") as _f:
+                _cfg = _yaml.safe_load(_f) or {}
+            vector_index_config = _cfg.get(profile, {}).get("weaviate", {}).get("vector_index_config", {})
+        except Exception as cfg_err:
+            logger.warning(f"Could not load vector_index_config from {config_path}: {cfg_err}")
+
         # Try the new orchestrator first
         try:
             from src.infrastructure.ingestion.ingestion_orchestrator import IngestionOrchestrator
             logger.info("Using IngestionOrchestrator for ingestion")
-            client.ensure_schema()
+            client.ensure_schema(vector_index_config=vector_index_config)
             orchestrator = IngestionOrchestrator(
                 client=client,
                 data_dir=str(data_dir),

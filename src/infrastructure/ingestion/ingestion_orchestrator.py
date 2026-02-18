@@ -24,7 +24,8 @@ class IngestionOrchestrator:
         client,
         data_dir: str,
         batch_size: int = 100,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
+        vector_index_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the orchestrator.
@@ -34,11 +35,13 @@ class IngestionOrchestrator:
             data_dir: Directory containing ESCO CSV files
             batch_size: Batch size for CSV processing
             progress_callback: Optional progress callback
+            vector_index_config: HNSW settings passed to ensure_schema()
         """
         self.client = client
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.progress_callback = progress_callback
+        self.vector_index_config = vector_index_config or {}
 
     def _update_heartbeat(self, step_name: str, processed: int = 0, total: int = 0) -> None:
         """Update heartbeat metadata for a given step."""
@@ -72,7 +75,9 @@ class IngestionOrchestrator:
         relation_builder = RelationBuilder(self.client, data_reader)
 
         steps = [
-            ("ensure_schema", lambda: self.client.ensure_schema()),
+            ("ensure_schema", lambda: self.client.ensure_schema(
+                vector_index_config=self.vector_index_config
+            )),
             ("ingest_isco_groups", entity_ingestor.ingest_isco_groups),
             ("ingest_occupations", entity_ingestor.ingest_occupations),
             ("ingest_skills", entity_ingestor.ingest_skills),

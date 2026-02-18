@@ -1,6 +1,7 @@
 class: Occupation
 vectorizer: none
-vectorIndexConfig: ${vector_index_config}
+vectorIndexType: hnsw
+vectorSearch: true
 properties:
   - name: conceptUri
     dataType: [string]
